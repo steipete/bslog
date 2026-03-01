@@ -2,7 +2,7 @@ import type { LogEntry } from '../types'
 import { getApiToken } from '../utils/config'
 
 const TELEMETRY_BASE_URL = 'https://telemetry.betterstack.com/api/v1'
-const QUERY_BASE_URL = 'https://eu-nbg-2-connect.betterstackdata.com'
+const QUERY_BASE_URL = process.env.BETTERSTACK_QUERY_ENDPOINT || 'https://eu-nbg-2-connect.betterstackdata.com'
 const DEFAULT_TIMEOUT_MS = 30_000
 
 interface RequestOptions {
