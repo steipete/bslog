@@ -6,15 +6,29 @@ var __getProtoOf = Object.getPrototypeOf;
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+function __accessProp(key) {
+  return this[key];
+}
+var __toESMCache_node;
+var __toESMCache_esm;
 var __toESM = (mod, isNodeMode, target) => {
+  var canCache = mod != null && typeof mod === "object";
+  if (canCache) {
+    var cache = isNodeMode ? __toESMCache_node ??= new WeakMap : __toESMCache_esm ??= new WeakMap;
+    var cached = cache.get(mod);
+    if (cached)
+      return cached;
+  }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames(mod))
     if (!__hasOwnProp.call(to, key))
       __defProp(to, key, {
-        get: () => mod[key],
+        get: __accessProp.bind(mod, key),
         enumerable: true
       });
+  if (canCache)
+    cache.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -1597,7 +1611,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         return arg.length > 1 && arg[0] === "-";
       }
       const negativeNumberArg = (arg) => {
-        if (!/^-\d*\.?\d+(e[+-]?\d+)?$/.test(arg))
+        if (!/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(arg))
           return false;
         return !this._getCommandAndAncestors().some((cmd) => cmd.options.map((opt) => opt.short).some((short) => /^-\d$/.test(short)));
       };
@@ -3026,7 +3040,7 @@ var require_colors = __commonJS((exports, module) => {
   colors.stripColors = colors.strip = function(str) {
     return ("" + str).replace(/\x1B\[\d+m/g, "");
   };
-  var stylize = colors.stylize = function stylize(str, style) {
+  var stylize = colors.stylize = function stylize2(str, style) {
     if (!colors.enabled) {
       return str + "";
     }
@@ -3044,8 +3058,8 @@ var require_colors = __commonJS((exports, module) => {
     return str.replace(matchOperatorsRe, "\\$&");
   };
   function build(_styles) {
-    var builder = function builder() {
-      return applyStyle3.apply(builder, arguments);
+    var builder = function builder2() {
+      return applyStyle3.apply(builder2, arguments);
     };
     builder._styles = _styles;
     builder.__proto__ = proto3;
@@ -3064,7 +3078,7 @@ var require_colors = __commonJS((exports, module) => {
     });
     return ret;
   }();
-  var proto3 = defineProps(function colors() {}, styles4);
+  var proto3 = defineProps(function colors2() {}, styles4);
   function applyStyle3() {
     var args = Array.prototype.slice.call(arguments);
     var str = args.map(function(arg) {
@@ -3123,7 +3137,7 @@ var require_colors = __commonJS((exports, module) => {
     });
     return ret;
   }
-  var sequencer = function sequencer(map2, str) {
+  var sequencer = function sequencer2(map2, str) {
     var exploded = str.split("");
     exploded = exploded.map(map2);
     return exploded.join("");
@@ -4305,10 +4319,36 @@ var package_default = {
   name: "@steipete/bslog",
   version: "1.4.0",
   description: "Better Stack log query CLI with GraphQL-inspired syntax",
-  author: "steipete",
+  keywords: [
+    "betterstack",
+    "cli",
+    "graphql",
+    "logging",
+    "logs",
+    "query"
+  ],
+  homepage: "https://github.com/steipete/bslog#readme",
+  bugs: {
+    url: "https://github.com/steipete/bslog/issues"
+  },
   license: "MIT",
-  main: "dist/index.js",
+  author: "steipete",
+  repository: {
+    type: "git",
+    url: "git+https://github.com/steipete/bslog.git"
+  },
+  bin: {
+    bslog: "dist/index.js"
+  },
+  directories: {
+    doc: "docs"
+  },
+  files: [
+    "dist/",
+    "README.md"
+  ],
   type: "module",
+  main: "dist/index.js",
   scripts: {
     dev: "bun run src/index.ts",
     build: "bun build ./src/index.ts --compile --outfile dist/bslog",
@@ -4318,54 +4358,30 @@ var package_default = {
     "test:integration": "bun test src/__tests__/integration",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsgo --noEmit",
     prepublishOnly: "bun run test && bun run build:npm",
-    lint: "biome check .",
-    "lint:fix": "biome check --write .",
-    format: "biome format --write ."
+    format: "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    lint: "bun run format:check && oxlint --deny-warnings src",
+    "lint:fix": "bun run format && oxlint --fix src"
   },
   dependencies: {
     chalk: "^5.6.2",
     "cli-table3": "^0.6.5",
-    commander: "^14.0.1",
-    dotenv: "^17.2.2"
+    commander: "^14.0.3",
+    dotenv: "^17.4.2"
   },
   devDependencies: {
-    "@biomejs/biome": "^2.2.4",
-    "@types/bun": "^1.2.22",
-    "@types/node": "^24.5.2",
-    typescript: "^5.9.2"
-  },
-  bin: {
-    bslog: "dist/index.js"
-  },
-  files: [
-    "dist/",
-    "README.md"
-  ],
-  keywords: [
-    "betterstack",
-    "logs",
-    "cli",
-    "logging",
-    "graphql",
-    "query"
-  ],
-  repository: {
-    type: "git",
-    url: "git+https://github.com/steipete/bslog.git"
+    "@types/bun": "^1.3.13",
+    "@types/node": "^25.6.0",
+    oxfmt: "^0.46.0",
+    oxlint: "^1.61.0",
+    typescript: "^6.0.3"
   },
   engines: {
     bun: ">=1.0.0"
   },
-  packageManager: "bun@1.2.22",
-  directories: {
-    doc: "docs"
-  },
-  bugs: {
-    url: "https://github.com/steipete/bslog/issues"
-  },
-  homepage: "https://github.com/steipete/bslog#readme"
+  packageManager: "bun@1.2.22"
 };
 
 // node_modules/chalk/source/index.js
@@ -4552,7 +4568,7 @@ function loadConfig() {
       parsed.defaultLogLevel = "all";
     }
     return parsed;
-  } catch (_error) {
+  } catch {
     console.warn("Failed to load config, using defaults");
     return {
       defaultLimit: 100,
@@ -4840,7 +4856,7 @@ class BetterStackClient {
         } else {
           console.error("Unexpected row payload:", line);
         }
-      } catch (_error) {
+      } catch {
         console.error("Failed to parse line:", line);
       }
     }
@@ -5154,36 +5170,40 @@ function parseGraphQLQuery(query) {
   if (!logsMatch) {
     throw new Error("Invalid query format. Expected: { logs(...) { ... } }");
   }
-  const [, argsStr, fieldsStr] = logsMatch;
+  const [, argsStr = "", fieldsStr = ""] = logsMatch;
   const options = {};
   if (argsStr) {
     const args = parseArguments(argsStr);
-    if (args.limit !== undefined) {
-      options.limit = Number.parseInt(args.limit, 10);
+    const limit = typeof args.limit === "number" ? args.limit : typeof args.limit === "string" ? Number.parseInt(args.limit, 10) : undefined;
+    if (limit !== undefined) {
+      options.limit = limit;
     }
-    if (args.level) {
+    if (typeof args.level === "string") {
       options.level = args.level;
     }
-    if (args.subsystem) {
+    if (typeof args.subsystem === "string") {
       options.subsystem = args.subsystem;
     }
-    if (args.since) {
+    if (typeof args.since === "string") {
       options.since = args.since;
     }
-    if (args.until) {
+    if (typeof args.until === "string") {
       options.until = args.until;
     }
     if (args.between && Array.isArray(args.between) && args.between.length === 2) {
-      options.since = args.between[0];
-      options.until = args.between[1];
+      const [since, until] = args.between;
+      if (typeof since === "string" && typeof until === "string") {
+        options.since = since;
+        options.until = until;
+      }
     }
-    if (args.search) {
+    if (typeof args.search === "string") {
       options.search = args.search;
     }
-    if (args.where && typeof args.where === "object") {
+    if (isRecord(args.where)) {
       options.where = args.where;
     }
-    if (args.source) {
+    if (typeof args.source === "string") {
       options.source = args.source;
     }
   }
@@ -5275,6 +5295,9 @@ function parseValue(value) {
     }
   }
   return value;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 // src/utils/formatter.ts
@@ -5740,7 +5763,8 @@ Following logs... (Press Ctrl+C to stop)`));
       if (newResults.length === 0) {
         return;
       }
-      const filtered = lastTimestamp ? newResults.filter((entry) => entry.dt > lastTimestamp) : newResults;
+      const previousTimestamp = lastTimestamp;
+      const filtered = previousTimestamp ? newResults.filter((entry) => entry.dt > previousTimestamp) : newResults;
       if (filtered.length === 0) {
         return;
       }
@@ -6018,7 +6042,8 @@ Following logs... (Press Ctrl+C to stop)`));
       if (newResults.length === 0) {
         return;
       }
-      const filtered = lastTimestamp ? newResults.filter((entry) => entry.dt > lastTimestamp) : newResults;
+      const previousTimestamp = lastTimestamp;
+      const filtered = previousTimestamp ? newResults.filter((entry) => entry.dt > previousTimestamp) : newResults;
       if (filtered.length === 0) {
         return;
       }
@@ -6321,7 +6346,8 @@ function registerLogCommand(program2, config) {
   }
   command.action(async (...rawArgs) => {
     const options = rawArgs.pop();
-    const plainOptions = typeof options.opts === "function" ? options.opts() : options;
+    const commandOptions = options;
+    const plainOptions = typeof commandOptions.opts === "function" ? commandOptions.opts() : options;
     const runtime = resolveRuntimeOptions(plainOptions);
     const filteredOptions = stripRuntimeOptionProps(plainOptions);
     await config.handler({
