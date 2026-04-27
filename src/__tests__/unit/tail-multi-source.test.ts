@@ -1,74 +1,74 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
-import type { LogEntry } from '../../types'
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import type { LogEntry } from "../../types";
 
 const executeMock = mock<(options: Record<string, unknown>) => Promise<LogEntry[]>>(() =>
   Promise.resolve([]),
-)
+);
 
-const { QueryAPI } = await import('../../api/query')
-const { tailLogs } = await import('../../commands/tail')
+const { QueryAPI } = await import("../../api/query");
+const { tailLogs } = await import("../../commands/tail");
 
-describe('tailLogs multi-source correlation', () => {
-  const originalLog = console.log
-  const originalError = console.error
-  const originalExecute = QueryAPI.prototype.execute
-  let logSpy: ReturnType<typeof mock>
-  let errorSpy: ReturnType<typeof mock>
+describe("tailLogs multi-source correlation", () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalExecute = QueryAPI.prototype.execute;
+  let logSpy: ReturnType<typeof mock>;
+  let errorSpy: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    executeMock.mockReset()
-    logSpy = mock(() => undefined)
-    errorSpy = mock(() => undefined)
-    console.log = logSpy as unknown as typeof console.log
-    console.error = errorSpy as unknown as typeof console.error
+    executeMock.mockReset();
+    logSpy = mock(() => undefined);
+    errorSpy = mock(() => undefined);
+    console.log = logSpy as unknown as typeof console.log;
+    console.error = errorSpy as unknown as typeof console.error;
 
     // Override QueryAPI execute
-    QueryAPI.prototype.execute = (options: Record<string, unknown>) => executeMock(options)
-  })
+    QueryAPI.prototype.execute = (options: Record<string, unknown>) => executeMock(options);
+  });
 
   afterEach(() => {
-    console.log = originalLog
-    console.error = originalError
-    QueryAPI.prototype.execute = originalExecute
-  })
+    console.log = originalLog;
+    console.error = originalError;
+    QueryAPI.prototype.execute = originalExecute;
+  });
 
-  it('merges multiple sources and annotates each entry with its origin', async () => {
+  it("merges multiple sources and annotates each entry with its origin", async () => {
     executeMock.mockImplementation((options: Record<string, unknown>) => {
       const fixtures: Record<string, LogEntry[]> = {
-        'source-a': [
-          { dt: '2025-09-24 12:00:05.000000', raw: '{}', message: 'A newest' },
-          { dt: '2025-09-24 11:59:00.000000', raw: '{}', message: 'A older' },
+        "source-a": [
+          { dt: "2025-09-24 12:00:05.000000", raw: "{}", message: "A newest" },
+          { dt: "2025-09-24 11:59:00.000000", raw: "{}", message: "A older" },
         ],
-        'source-b': [
-          { dt: '2025-09-24 12:00:07.000000', raw: '{}', message: 'B newest' },
-          { dt: '2025-09-24 12:00:01.000000', raw: '{}', message: 'B older' },
+        "source-b": [
+          { dt: "2025-09-24 12:00:07.000000", raw: "{}", message: "B newest" },
+          { dt: "2025-09-24 12:00:01.000000", raw: "{}", message: "B older" },
         ],
-      }
+      };
 
-      const sourceName = typeof options.source === 'string' ? options.source : undefined
-      const dataset = sourceName ? (fixtures[sourceName] ?? []) : []
-      const limitValue = typeof options.limit === 'number' ? options.limit : Number.NaN
-      const limited = Number.isFinite(limitValue) ? dataset.slice(0, limitValue) : dataset
-      return Promise.resolve(limited)
-    })
+      const sourceName = typeof options.source === "string" ? options.source : undefined;
+      const dataset = sourceName ? (fixtures[sourceName] ?? []) : [];
+      const limitValue = typeof options.limit === "number" ? options.limit : Number.NaN;
+      const limited = Number.isFinite(limitValue) ? dataset.slice(0, limitValue) : dataset;
+      return Promise.resolve(limited);
+    });
 
-    await tailLogs({ sources: ['source-a', 'source-b'], format: 'json', limit: 3 })
+    await tailLogs({ sources: ["source-a", "source-b"], format: "json", limit: 3 });
 
-    expect(executeMock.mock.calls.length).toBe(2)
+    expect(executeMock.mock.calls.length).toBe(2);
     const calledSources = executeMock.mock.calls.map(([callOptions]) => {
-      const value = callOptions.source
-      return typeof value === 'string' ? value : ''
-    })
-    expect(new Set(calledSources)).toEqual(new Set(['source-a', 'source-b']))
+      const value = callOptions.source;
+      return typeof value === "string" ? value : "";
+    });
+    expect(new Set(calledSources)).toEqual(new Set(["source-a", "source-b"]));
 
-    expect(logSpy.mock.calls.length).toBe(1)
-    const payload = JSON.parse(logSpy.mock.calls[0][0] as string)
+    expect(logSpy.mock.calls.length).toBe(1);
+    const payload = JSON.parse(logSpy.mock.calls[0][0] as string);
 
-    expect(Array.isArray(payload)).toBe(true)
-    expect(payload).toHaveLength(3)
-    const typedPayload = payload as Array<{ source: string; dt: string }>
-    expect(typedPayload.map((entry) => entry.source)).toEqual(['source-b', 'source-a', 'source-b'])
-    expect(typedPayload[0].dt).toBe('2025-09-24 12:00:07.000000')
-    expect(errorSpy.mock.calls.length).toBe(0)
-  })
-})
+    expect(Array.isArray(payload)).toBe(true);
+    expect(payload).toHaveLength(3);
+    const typedPayload = payload as Array<{ source: string; dt: string }>;
+    expect(typedPayload.map((entry) => entry.source)).toEqual(["source-b", "source-a", "source-b"]);
+    expect(typedPayload[0].dt).toBe("2025-09-24 12:00:07.000000");
+    expect(errorSpy.mock.calls.length).toBe(0);
+  });
+});

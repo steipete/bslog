@@ -30,13 +30,13 @@ Better Stack's MCP (Model Context Protocol) endpoints expose the same log storag
 - **Consider credential flow.** MCP sessions often require short-lived "Connect remotely" credentials, while bslog reads long-lived environment variables once per machine.
 - **Collaborate with both.** Share MCP snapshots with teammates for at-a-glance status, then dive into bslog to follow requests, inspect stack traces, or automate reporting.
 
-| Reach for MCP when you need... | Reach for bslog CLI when you need... |
-| --- | --- |
+| Reach for MCP when you need...                                  | Reach for bslog CLI when you need...                                        |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Lightweight, conversational context inline with an AI assistant | Full-fidelity log payloads, streaming output, and piping into local tooling |
-| Quick summaries or counts across a narrow time window | Chronological drill-down across multiple sources with `--sources dev,prod` |
-| Built-in helpers for quick aggregated snapshots | Explicit SQL, `--format json`, or `--jq` when you need rollups |
-| Temporary credentials you can rotate per debugging session | Long-lived local credentials stored in your shell profile |
-| Remote teammates to reproduce a query in their chat workspace | Automation or scripting from CI/cron with reproducible output formats |
+| Quick summaries or counts across a narrow time window           | Chronological drill-down across multiple sources with `--sources dev,prod`  |
+| Built-in helpers for quick aggregated snapshots                 | Explicit SQL, `--format json`, or `--jq` when you need rollups              |
+| Temporary credentials you can rotate per debugging session      | Long-lived local credentials stored in your shell profile                   |
+| Remote teammates to reproduce a query in their chat workspace   | Automation or scripting from CI/cron with reproducible output formats       |
 
 ### Field-aware filters built in
 
@@ -86,7 +86,7 @@ npm install -g @steipete/bslog
 git clone https://github.com/steipete/bslog.git
 cd bslog
 bun install   # Uses Bun for package management
-bun run build # Uses Bun for building and running  
+bun run build # Uses Bun for building and running
 bun link      # Link globally for testing
 ```
 
@@ -115,6 +115,7 @@ This separation allows teams to grant different access levels - for example, som
 ### 1. Telemetry API Token (Required)
 
 **What it's used for:**
+
 - Listing available log sources (`bslog sources list`)
 - Getting source metadata (team ID, table names)
 - Resolving source names to table identifiers
@@ -134,6 +135,7 @@ export BETTERSTACK_API_TOKEN="your_telemetry_token_here"
 ### 2. Query API Credentials (Required for querying logs)
 
 **What it's used for:**
+
 - Actually reading log data (`bslog tail`, `bslog errors`, etc.)
 - Executing SQL queries against log tables
 - Any command that retrieves log content
@@ -226,6 +228,7 @@ bslog tail --since 1h
 # Get warnings from the last 2 days
 bslog warnings --since 2d
 ```
+
 ## GraphQL-Inspired Query Syntax
 
 The killer feature of bslog is its intuitive query language that feels like GraphQL:
@@ -254,17 +257,17 @@ bslog query "{ logs(subsystem: 'api', limit: 100) { dt, message } }"
 bslog query "{ logs(where: { userId: '12345' }) { * } }"
 
 # Complex filters
-bslog query "{ 
+bslog query "{
   logs(
     level: 'error',
     subsystem: 'payment',
     since: '1h',
     limit: 200
-  ) { 
-    dt, 
-    message, 
-    userId, 
-    error_details 
+  ) {
+    dt,
+    message,
+    userId,
+    error_details
   }
 }"
 
@@ -284,6 +287,7 @@ bslog query "{ logs(search: 'database connection') { dt, message } }"
 ### Core Commands
 
 #### `tail` - Stream logs
+
 ```bash
 bslog tail [options]
 
@@ -311,6 +315,7 @@ Examples:
 When you pass multiple names to `--sources`, bslog issues concurrent queries, merges the results in strict timestamp order, and augments every row with a `source` field. The combined output works with all formatters (`pretty`, `json`, `table`, `csv`) and keeps follow mode responsive by polling each source independently.
 
 #### `errors` - Show only error logs
+
 ```bash
 bslog errors [options]
 
@@ -328,6 +333,7 @@ Examples:
 ```
 
 #### `warnings` - Show only warning logs
+
 ```bash
 bslog warnings [options]
 
@@ -335,6 +341,7 @@ bslog warnings [options]
 ```
 
 #### `search` - Search logs for patterns
+
 ```bash
 bslog search <pattern> [options]
 
@@ -354,6 +361,7 @@ Examples:
 ```
 
 #### `trace` - Follow a request ID across sources
+
 ```bash
 bslog trace <requestId> [options]
 
@@ -372,6 +380,7 @@ Examples:
 ```
 
 #### `query` - GraphQL-inspired queries
+
 ```bash
 bslog query <query> [options]
 
@@ -386,6 +395,7 @@ Examples:
 ```
 
 #### `sql` - Raw SQL queries (Advanced)
+
 ```bash
 bslog sql <sql> [options]
 
@@ -400,6 +410,7 @@ Example:
 ### Source Management
 
 #### `sources list` - List all available sources
+
 ```bash
 bslog sources list [options]
 
@@ -411,6 +422,7 @@ Example:
 ```
 
 #### `sources get` - Get source details
+
 ```bash
 bslog sources get <name> [options]
 
@@ -427,7 +439,7 @@ For convenience, common source aliases are available:
 
 - `dev`, `development` → `sweetistics-dev`
 - `prod`, `production` → `sweetistics`
-- `staging` → `sweetistics-staging` 
+- `staging` → `sweetistics-staging`
 - `test` → `sweetistics-test`
 
 ```bash
@@ -444,6 +456,7 @@ bslog query "{ logs(limit: 10) { * } }" --source staging
 ### Configuration
 
 #### `config set` - Set configuration values
+
 ```bash
 bslog config set <key> <value>
 
@@ -461,12 +474,14 @@ Examples:
 ```
 
 #### `config show` - Show current configuration
+
 ```bash
 bslog config show
 bslog config show --format json
 ```
 
 #### `config source` - Shorthand for setting default source
+
 ```bash
 bslog config source <name>
 
@@ -488,7 +503,9 @@ The `--since` and `--until` options support various time formats:
 Choose the output format that works best for your use case:
 
 ### `pretty` (Default for most commands)
+
 Color-coded, human-readable format with proper formatting:
+
 ```
 [2024-01-15 10:30:45.123] ERROR [api] User authentication failed
   userId: 12345
@@ -496,7 +513,9 @@ Color-coded, human-readable format with proper formatting:
 ```
 
 ### `json` (Default for SQL queries)
+
 Standard JSON output, perfect for piping to other tools:
+
 ```json
 [
   {
@@ -508,7 +527,9 @@ Standard JSON output, perfect for piping to other tools:
 ```
 
 ### `table`
+
 Formatted table output for structured viewing:
+
 ```
 ┌──────────────────────┬───────┬──────────────────────────┐
 │ dt                   │ level │ message                  │
@@ -518,7 +539,9 @@ Formatted table output for structured viewing:
 ```
 
 ### `csv`
+
 CSV format for spreadsheet import:
+
 ```csv
 dt,level,message
 "2024-01-15 10:30:45.123","error","User authentication failed"
@@ -552,7 +575,7 @@ You can combine multiple filters for precise queries:
 
 ```bash
 # Errors from API subsystem in the last hour
-bslog query "{ 
+bslog query "{
   logs(
     level: 'error',
     subsystem: 'api',
@@ -564,7 +587,7 @@ bslog query "{
 bslog query "{
   logs(
     search: 'timeout',
-    where: { 
+    where: {
       environment: 'production',
       userId: { not: 'test-user' }
     }
@@ -630,6 +653,7 @@ bslog config source correct-source-name
 ### Connection timeouts
 
 If you're experiencing timeouts, try:
+
 - Reducing the `--limit` parameter
 - Using more specific time ranges with `--since` and `--until`
 - Checking your network connection
@@ -651,7 +675,7 @@ bun run build
 # Run all tests
 bun test
 
-# Run unit tests only  
+# Run unit tests only
 bun test:unit
 
 # Run integration tests only
@@ -665,6 +689,7 @@ bun test:coverage
 ```
 
 The test suite includes:
+
 - **Unit tests** for utilities, parsers, and formatters
 - **Integration tests** for query building and API interactions
 - **70+ test cases** ensuring reliability

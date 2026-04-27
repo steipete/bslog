@@ -1,129 +1,138 @@
-import type { QueryOptions } from '../types'
+import type { QueryOptions } from "../types";
 
 export function parseGraphQLQuery(query: string): QueryOptions {
   // Remove outer braces and whitespace
-  let normalizedQuery = query.trim()
-  if (normalizedQuery.startsWith('{') && normalizedQuery.endsWith('}')) {
-    normalizedQuery = normalizedQuery.slice(1, -1).trim()
+  let normalizedQuery = query.trim();
+  if (normalizedQuery.startsWith("{") && normalizedQuery.endsWith("}")) {
+    normalizedQuery = normalizedQuery.slice(1, -1).trim();
   }
 
   // Match the logs query pattern
-  const logsMatch = normalizedQuery.match(/logs\s*\((.*?)\)\s*\{(.*?)\}/s)
+  const logsMatch = normalizedQuery.match(/logs\s*\((.*?)\)\s*\{(.*?)\}/s);
   if (!logsMatch) {
-    throw new Error('Invalid query format. Expected: { logs(...) { ... } }')
+    throw new Error("Invalid query format. Expected: { logs(...) { ... } }");
   }
 
-  const [, argsStr, fieldsStr] = logsMatch
+  const [, argsStr = "", fieldsStr = ""] = logsMatch;
 
   // Parse arguments
-  const options: QueryOptions = {}
+  const options: QueryOptions = {};
 
   if (argsStr) {
     // Parse arguments like: limit: 100, level: 'error', where: { ... }
-    const args = parseArguments(argsStr)
+    const args = parseArguments(argsStr);
 
-    if (args.limit !== undefined) {
-      options.limit = Number.parseInt(args.limit, 10)
+    const limit =
+      typeof args.limit === "number"
+        ? args.limit
+        : typeof args.limit === "string"
+          ? Number.parseInt(args.limit, 10)
+          : undefined;
+    if (limit !== undefined) {
+      options.limit = limit;
     }
 
-    if (args.level) {
-      options.level = args.level
+    if (typeof args.level === "string") {
+      options.level = args.level;
     }
 
-    if (args.subsystem) {
-      options.subsystem = args.subsystem
+    if (typeof args.subsystem === "string") {
+      options.subsystem = args.subsystem;
     }
 
-    if (args.since) {
-      options.since = args.since
+    if (typeof args.since === "string") {
+      options.since = args.since;
     }
 
-    if (args.until) {
-      options.until = args.until
+    if (typeof args.until === "string") {
+      options.until = args.until;
     }
 
     if (args.between && Array.isArray(args.between) && args.between.length === 2) {
-      options.since = args.between[0]
-      options.until = args.between[1]
+      const [since, until] = args.between;
+      if (typeof since === "string" && typeof until === "string") {
+        options.since = since;
+        options.until = until;
+      }
     }
 
-    if (args.search) {
-      options.search = args.search
+    if (typeof args.search === "string") {
+      options.search = args.search;
     }
 
-    if (args.where && typeof args.where === 'object') {
-      options.where = args.where
+    if (isRecord(args.where)) {
+      options.where = args.where;
     }
 
-    if (args.source) {
-      options.source = args.source
+    if (typeof args.source === "string") {
+      options.source = args.source;
     }
   }
 
   // Parse fields
   if (fieldsStr) {
     const fields = fieldsStr
-      .split(',')
+      .split(",")
       .map((f) => f.trim())
-      .filter((f) => f.length > 0)
-    if (fields.length > 0 && fields[0] !== '*') {
-      options.fields = fields
+      .filter((f) => f.length > 0);
+    if (fields.length > 0 && fields[0] !== "*") {
+      options.fields = fields;
     }
   }
 
-  return options
+  return options;
 }
 
 function parseArguments(argsStr: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
+  const result: Record<string, unknown> = {};
 
   // Simple regex-based parser for arguments
   // This handles: key: value, key: 'string', key: 123, key: { ... }, key: [ ... ]
 
-  let currentKey = ''
-  let currentValue = ''
-  let depth = 0
-  let inString = false
-  let stringChar = ''
+  let currentKey = "";
+  let currentValue = "";
+  let depth = 0;
+  let inString = false;
+  let stringChar = "";
 
   for (let i = 0; i < argsStr.length; i++) {
-    const char = argsStr[i]
+    const char = argsStr[i];
 
     if (inString) {
-      if (char === stringChar && argsStr[i - 1] !== '\\') {
-        inString = false
+      if (char === stringChar && argsStr[i - 1] !== "\\") {
+        inString = false;
       }
-      currentValue += char
+      currentValue += char;
     } else if (char === '"' || char === "'") {
-      inString = true
-      stringChar = char
-      currentValue += char
-    } else if (char === '{' || char === '[') {
-      depth++
-      currentValue += char
-    } else if (char === '}' || char === ']') {
-      depth--
-      currentValue += char
-    } else if (char === ':' && depth === 0 && !currentKey) {
-      currentKey = currentValue.trim()
-      currentValue = ''
-    } else if (char === ',' && depth === 0) {
+      inString = true;
+      stringChar = char;
+      currentValue += char;
+    } else if (char === "{" || char === "[") {
+      depth++;
+      currentValue += char;
+    } else if (char === "}" || char === "]") {
+      depth--;
+      currentValue += char;
+    } else if (char === ":" && depth === 0 && !currentKey) {
+      currentKey = currentValue.trim();
+      currentValue = "";
+    } else if (char === "," && depth === 0) {
       if (currentKey) {
-        result[currentKey] = parseValue(currentValue.trim())
-        currentKey = ''
-        currentValue = ''
+        result[currentKey] = parseValue(currentValue.trim());
+        currentKey = "";
+        currentValue = "";
       }
     } else {
-      currentValue += char
+      currentValue += char;
     }
   }
 
   // Handle last key-value pair
   if (currentKey && currentValue) {
-    result[currentKey] = parseValue(currentValue.trim())
+    result[currentKey] = parseValue(currentValue.trim());
   }
 
-  return result
+  return result;
 }
 
 function parseValue(value: string): unknown {
@@ -132,52 +141,56 @@ function parseValue(value: string): unknown {
     (value.startsWith("'") && value.endsWith("'")) ||
     (value.startsWith('"') && value.endsWith('"'))
   ) {
-    return value.slice(1, -1)
+    return value.slice(1, -1);
   }
 
   // Parse numbers
   if (/^\d+$/.test(value)) {
-    return Number.parseInt(value, 10)
+    return Number.parseInt(value, 10);
   }
 
   // Parse booleans
-  if (value === 'true') {
-    return true
+  if (value === "true") {
+    return true;
   }
-  if (value === 'false') {
-    return false
+  if (value === "false") {
+    return false;
   }
 
   // Parse objects
-  if (value.startsWith('{') && value.endsWith('}')) {
+  if (value.startsWith("{") && value.endsWith("}")) {
     try {
       // Simple object parser
-      const objStr = value.slice(1, -1)
-      const obj: Record<string, unknown> = {}
-      const pairs = objStr.split(',')
+      const objStr = value.slice(1, -1);
+      const obj: Record<string, unknown> = {};
+      const pairs = objStr.split(",");
 
       for (const pair of pairs) {
-        const [key, val] = pair.split(':').map((s) => s.trim())
+        const [key, val] = pair.split(":").map((s) => s.trim());
         if (key && val) {
-          obj[key] = parseValue(val)
+          obj[key] = parseValue(val);
         }
       }
 
-      return obj
+      return obj;
     } catch {
-      return value
+      return value;
     }
   }
 
   // Parse arrays
-  if (value.startsWith('[') && value.endsWith(']')) {
+  if (value.startsWith("[") && value.endsWith("]")) {
     try {
-      const arrStr = value.slice(1, -1)
-      return arrStr.split(',').map((s) => parseValue(s.trim()))
+      const arrStr = value.slice(1, -1);
+      return arrStr.split(",").map((s) => parseValue(s.trim()));
     } catch {
-      return value
+      return value;
     }
   }
 
-  return value
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,11 +1,13 @@
 # Better Stack Log CLI (bslog) Specification
 
 ## Overview
+
 A TypeScript-based CLI tool for querying Better Stack (formerly Logtail) logs with an intuitive, GraphQL-inspired query syntax. The tool provides both simple commands for common queries and advanced SQL capabilities for power users.
 
 ## Core Features
 
 ### 1. Query Logs
+
 - **Last N logs**: Get the most recent N log entries (default: 100)
 - **Time-based queries**: Query logs within specific time ranges
 - **Field filtering**: Filter by any JSON field in the logs
@@ -14,11 +16,13 @@ A TypeScript-based CLI tool for querying Better Stack (formerly Logtail) logs wi
 - **Pattern matching**: Search for text patterns within logs
 
 ### 2. Source Management
+
 - List all available log sources
 - Get details about a specific source
 - Set default source for queries
 
 ### 3. Output Formats
+
 - JSON (default)
 - Pretty-printed table
 - CSV export
@@ -27,6 +31,7 @@ A TypeScript-based CLI tool for querying Better Stack (formerly Logtail) logs wi
 ## Query Syntax Design
 
 ### GraphQL-Inspired Syntax
+
 We'll use a simplified GraphQL-like syntax that's intuitive and easy to learn:
 
 ```bash
@@ -43,9 +48,9 @@ bslog query "{ logs(between: ['2025-01-01', '2025-01-02']) { dt, message } }"
 bslog query "{ logs(search: 'user authentication') { * } }"
 
 # Complex filtering
-bslog query "{ 
+bslog query "{
   logs(
-    where: { 
+    where: {
       level: 'error',
       subsystem: 'payment',
       userId: '123'
@@ -56,6 +61,7 @@ bslog query "{
 ```
 
 ### Shorthand Commands
+
 For common queries, provide simple CLI commands:
 
 ```bash
@@ -82,19 +88,21 @@ bslog config source sweetistics-dev
 ```
 
 ### Advanced SQL Mode
+
 For power users, allow raw ClickHouse SQL:
 
 ```bash
-bslog sql "SELECT dt, JSON_VALUE(raw, '$.level') AS level, raw 
-           FROM remote(t123456_logs) 
-           WHERE raw LIKE '%error%' 
-           ORDER BY dt DESC 
+bslog sql "SELECT dt, JSON_VALUE(raw, '$.level') AS level, raw
+           FROM remote(t123456_logs)
+           WHERE raw LIKE '%error%'
+           ORDER BY dt DESC
            LIMIT 100"
 ```
 
 ## Architecture
 
 ### Directory Structure
+
 ```
 apps/bslog/
 ├── spec.md                  # This specification
@@ -130,29 +138,34 @@ apps/bslog/
 ### Core Components
 
 #### 1. API Client
+
 - Handles authentication using Bearer token
 - Manages HTTP requests to Better Stack API
 - Implements retry logic and error handling
 - Supports both Telemetry API and Query API
 
 #### 2. Query Parser
+
 - Parses GraphQL-like syntax into an AST
 - Converts AST to ClickHouse SQL
 - Validates query structure
 - Handles field selection and filtering
 
 #### 3. SQL Builder
+
 - Constructs ClickHouse SQL queries
 - Handles JSON field extraction
 - Manages time range filters
 - Optimizes query performance
 
 #### 4. Configuration Manager
+
 - Reads API token from environment variable
 - Manages default source configuration
 - Stores user preferences in `~/.bslog/config.json`
 
 #### 5. Output Formatter
+
 - Formats results based on output type
 - Pretty-prints tables for terminal
 - Exports to CSV/JSON
@@ -161,22 +174,26 @@ apps/bslog/
 ## Implementation Details
 
 ### Authentication
+
 - Read `BETTERSTACK_API_TOKEN` from environment
 - Support `.env` file for local development
 - Validate token on first use
 
 ### Query Optimization
+
 - Always include LIMIT clause (default: 100, max: 10000)
 - Use time-based partitioning for better performance
 - Cache source metadata locally
 
 ### Error Handling
+
 - Graceful handling of network errors
 - Clear error messages for invalid queries
 - Helpful suggestions for common mistakes
 - Retry logic with exponential backoff
 
 ### Performance
+
 - Use Bun's native HTTP client for speed
 - Stream large result sets
 - Implement pagination for large queries
@@ -185,6 +202,7 @@ apps/bslog/
 ## Configuration
 
 ### Environment Variables
+
 ```bash
 BETTERSTACK_API_TOKEN=Bbu9CBf9JxuePAqTdhETDQZu  # API token
 BSLOG_DEFAULT_SOURCE=sweetistics-dev              # Default source
@@ -193,6 +211,7 @@ BSLOG_OUTPUT_FORMAT=json                         # Default output format
 ```
 
 ### Config File (`~/.bslog/config.json`)
+
 ```json
 {
   "defaultSource": "sweetistics-dev",
@@ -216,11 +235,13 @@ BSLOG_OUTPUT_FORMAT=json                         # Default output format
 ## Build & Distribution
 
 ### Build Process
+
 1. TypeScript compilation with Bun
 2. Bundle into single executable
 3. Create shell wrapper for global installation
 
 ### Installation
+
 ```bash
 # Development
 bun install

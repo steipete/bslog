@@ -1,82 +1,82 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from "bun:test";
 import {
   normalizeSourcesOption,
   parseLimitOption,
   parseWhereOption,
   resolveRuntimeOptions,
-} from '../../utils/options'
+} from "../../utils/options";
 
-describe('CLI option helpers', () => {
-  describe('normalizeSourcesOption', () => {
-    it('returns undefined for empty input', () => {
-      expect(normalizeSourcesOption(undefined)).toBeUndefined()
-      expect(normalizeSourcesOption('')).toBeUndefined()
-    })
+describe("CLI option helpers", () => {
+  describe("normalizeSourcesOption", () => {
+    it("returns undefined for empty input", () => {
+      expect(normalizeSourcesOption(undefined)).toBeUndefined();
+      expect(normalizeSourcesOption("")).toBeUndefined();
+    });
 
-    it('deduplicates and trims sources', () => {
-      expect(normalizeSourcesOption(['prod,dev', ' prod '])).toEqual(['prod', 'dev'])
-    })
-  })
+    it("deduplicates and trims sources", () => {
+      expect(normalizeSourcesOption(["prod,dev", " prod "])).toEqual(["prod", "dev"]);
+    });
+  });
 
-  describe('parseLimitOption', () => {
-    it('parses numeric values', () => {
-      expect(parseLimitOption('200')).toBe(200)
-      expect(parseLimitOption(50)).toBe(50)
-    })
+  describe("parseLimitOption", () => {
+    it("parses numeric values", () => {
+      expect(parseLimitOption("200")).toBe(200);
+      expect(parseLimitOption(50)).toBe(50);
+    });
 
-    it('returns undefined for invalid values', () => {
-      expect(parseLimitOption('foo')).toBeUndefined()
-    })
-  })
+    it("returns undefined for invalid values", () => {
+      expect(parseLimitOption("foo")).toBeUndefined();
+    });
+  });
 
-  describe('parseWhereOption', () => {
-    it('parses simple equality expressions', () => {
-      expect(parseWhereOption(['module=timeline', 'env=production'])).toEqual({
-        module: 'timeline',
-        env: 'production',
-      })
-    })
+  describe("parseWhereOption", () => {
+    it("parses simple equality expressions", () => {
+      expect(parseWhereOption(["module=timeline", "env=production"])).toEqual({
+        module: "timeline",
+        env: "production",
+      });
+    });
 
-    it('parses typed values', () => {
+    it("parses typed values", () => {
       expect(
-        parseWhereOption(['attempt=5', 'active=true', 'deleted=false', 'userId=null']),
+        parseWhereOption(["attempt=5", "active=true", "deleted=false", "userId=null"]),
       ).toEqual({
         attempt: 5,
         active: true,
         deleted: false,
         userId: null,
-      })
-    })
+      });
+    });
 
-    it('parses quoted and JSON values', () => {
+    it("parses quoted and JSON values", () => {
       expect(
-        parseWhereOption(["route='/api/timeline'", 'meta={"flag":true}', 'ids=[1,2]']),
+        parseWhereOption(["route='/api/timeline'", 'meta={"flag":true}', "ids=[1,2]"]),
       ).toEqual({
-        route: '/api/timeline',
+        route: "/api/timeline",
         meta: { flag: true },
         ids: [1, 2],
-      })
-    })
+      });
+    });
 
-    it('returns undefined when no valid filters provided', () => {
-      expect(parseWhereOption([])).toBeUndefined()
-      expect(parseWhereOption(['invalid'])).toBeUndefined()
-    })
-  })
+    it("returns undefined when no valid filters provided", () => {
+      expect(parseWhereOption([])).toBeUndefined();
+      expect(parseWhereOption(["invalid"])).toBeUndefined();
+    });
+  });
 
-  describe('resolveRuntimeOptions', () => {
-    it('combines parsed limit, sources, and where filters', () => {
+  describe("resolveRuntimeOptions", () => {
+    it("combines parsed limit, sources, and where filters", () => {
       const result = resolveRuntimeOptions({
-        limit: '25',
-        sources: 'prod,dev',
-        where: ['module=timeline'],
-        jq: '.[]',
-      })
+        limit: "25",
+        sources: "prod,dev",
+        where: ["module=timeline"],
+        jq: ".[]",
+      });
 
-      expect(result.limit).toBe(25)
-      expect(result.sources).toEqual(['prod', 'dev'])
-      expect(result.where).toEqual({ module: 'timeline' })
-      expect(result.jq).toBe('.[]')
-    })
-  })
-})
+      expect(result.limit).toBe(25);
+      expect(result.sources).toEqual(["prod", "dev"]);
+      expect(result.where).toEqual({ module: "timeline" });
+      expect(result.jq).toBe(".[]");
+    });
+  });
+});

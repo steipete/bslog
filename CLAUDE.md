@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Building and Running
+
 ```bash
 # Development - run directly with Bun
 bun run dev
@@ -20,6 +21,7 @@ bun install
 ```
 
 ### Testing
+
 ```bash
 # Run all tests
 bun test
@@ -38,6 +40,7 @@ bun test:coverage
 ```
 
 ### Code Quality
+
 ```bash
 # Type checking - must pass before commit
 bun run type-check
@@ -55,9 +58,11 @@ bun run format
 ## Architecture Overview
 
 ### Core Structure
+
 The application is a CLI tool built with Bun and TypeScript that provides a GraphQL-inspired query interface for Better Stack logs.
 
 **Key architectural decisions:**
+
 - **Bun runtime**: Used for fast execution, native TypeScript support, and package management
 - **Commander.js**: For CLI command parsing and structure
 - **Dual authentication**: Requires both Telemetry API token (for source discovery) and Query API credentials (for log data access)
@@ -65,6 +70,7 @@ The application is a CLI tool built with Bun and TypeScript that provides a Grap
 - **Source aliases**: Built-in aliases for common environments (dev→sweetistics-dev, prod→sweetistics, etc.)
 
 ### Directory Layout
+
 ```
 src/
 ├── api/            # API clients for Better Stack
@@ -87,12 +93,14 @@ src/
 ```
 
 ### Authentication Flow
+
 1. **Telemetry API** (`BETTERSTACK_API_TOKEN`): Used by `SourcesAPI` to discover available log sources and get table metadata
 2. **Query API** (`BETTERSTACK_QUERY_USERNAME/PASSWORD`): Used by `QueryAPI` to execute ClickHouse SQL queries against log data
 
 The separation allows for granular access control - some users might list sources but not read logs.
 
 ### Query Processing Pipeline
+
 1. User provides GraphQL-like query or uses convenience commands (tail, errors, etc.)
 2. `parseGraphQLQuery()` converts GraphQL syntax to `QueryOptions` object
 3. `QueryAPI.buildQuery()` constructs ClickHouse SQL:
@@ -105,22 +113,26 @@ The separation allows for granular access control - some users might list source
 ### Key Implementation Details
 
 **Command Structure:**
+
 - Commands support positional source argument: `bslog tail sweetistics-dev`
 - All query commands support verbose mode (`-v`) to show generated SQL
 - Follow mode (`-f`) implemented via polling with configurable interval
 
 **Configuration Management:**
+
 - Config stored in `~/.bslog/config.json`
 - Supports default source, limit, and output format
 - Query history and saved queries for future features
 - Source aliases for convenient environment switching
 
 **Error Handling:**
+
 - Detailed error messages for missing credentials
 - Source validation before query execution
 - Graceful handling of network timeouts
 
 **Type Safety:**
+
 - Strict TypeScript configuration
 - No implicit any (warned by Biome)
 - Comprehensive type definitions in `src/types.ts`

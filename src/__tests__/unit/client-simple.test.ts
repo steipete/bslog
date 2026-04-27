@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-describe('Client Error Messages', () => {
-  let originalEnv: Record<string, string | undefined>
+describe("Client Error Messages", () => {
+  let originalEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
     // Save original environment variables
@@ -9,25 +9,25 @@ describe('Client Error Messages', () => {
       BETTERSTACK_API_TOKEN: process.env.BETTERSTACK_API_TOKEN,
       BETTERSTACK_QUERY_USERNAME: process.env.BETTERSTACK_QUERY_USERNAME,
       BETTERSTACK_QUERY_PASSWORD: process.env.BETTERSTACK_QUERY_PASSWORD,
-    }
-  })
+    };
+  });
 
   afterEach(() => {
     // Restore original environment variables
     for (const [key, value] of Object.entries(originalEnv)) {
       if (value === undefined) {
-        delete process.env[key]
+        delete process.env[key];
       } else {
-        process.env[key] = value
+        process.env[key] = value;
       }
     }
-  })
+  });
 
-  describe('error message formatting', () => {
-    it('should format malformed token error message correctly', () => {
-      process.env.BETTERSTACK_API_TOKEN = 'test-token'
-      delete process.env.BETTERSTACK_QUERY_USERNAME
-      delete process.env.BETTERSTACK_QUERY_PASSWORD
+  describe("error message formatting", () => {
+    it("should format malformed token error message correctly", () => {
+      process.env.BETTERSTACK_API_TOKEN = "test-token";
+      delete process.env.BETTERSTACK_QUERY_USERNAME;
+      delete process.env.BETTERSTACK_QUERY_PASSWORD;
 
       const expectedError =
         `Query API authentication failed: Malformed token\n\n` +
@@ -48,15 +48,15 @@ describe('Client Error Messages', () => {
         `To get Query API credentials:\n` +
         `1. Go to Better Stack > Logs > Dashboards\n` +
         `2. Click "Connect remotely"\n` +
-        `3. Create credentials and save them`
+        `3. Create credentials and save them`;
 
-      expect(expectedError).toContain('BETTERSTACK_API_TOKEN: ✓ Set')
-      expect(expectedError).toContain('BETTERSTACK_QUERY_USERNAME: ✗ Not set')
-      expect(expectedError).toContain('To fix this:')
-      expect(expectedError).toContain('Go to Better Stack > Logs > Dashboards')
-    })
+      expect(expectedError).toContain("BETTERSTACK_API_TOKEN: ✓ Set");
+      expect(expectedError).toContain("BETTERSTACK_QUERY_USERNAME: ✗ Not set");
+      expect(expectedError).toContain("To fix this:");
+      expect(expectedError).toContain("Go to Better Stack > Logs > Dashboards");
+    });
 
-    it('should format authentication failure message correctly', () => {
+    it("should format authentication failure message correctly", () => {
       const expectedError =
         `Query API authentication failed.\n\n` +
         `The Query API requires separate credentials from your API token.\n` +
@@ -68,12 +68,12 @@ describe('Client Error Messages', () => {
         `export BETTERSTACK_QUERY_USERNAME="your_username"\n` +
         `export BETTERSTACK_QUERY_PASSWORD="your_password"\n\n` +
         `Or pass them directly:\n` +
-        `bslog tail --username "user" --password "pass"`
+        `bslog tail --username "user" --password "pass"`;
 
-      expect(expectedError).toContain('The Query API requires separate credentials')
-      expect(expectedError).toContain('Go to Better Stack > Logs > Dashboards')
-      expect(expectedError).toContain('Click "Connect remotely"')
-      expect(expectedError).toContain('export BETTERSTACK_QUERY_USERNAME')
-    })
-  })
-})
+      expect(expectedError).toContain("The Query API requires separate credentials");
+      expect(expectedError).toContain("Go to Better Stack > Logs > Dashboards");
+      expect(expectedError).toContain('Click "Connect remotely"');
+      expect(expectedError).toContain("export BETTERSTACK_QUERY_USERNAME");
+    });
+  });
+});

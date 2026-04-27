@@ -1,308 +1,308 @@
-import type { LogEntry, QueryOptions } from '../types'
-import { getQueryCredentials, loadConfig, resolveSourceAlias } from '../utils/config'
-import { parseTimeString, toClickHouseDateTime } from '../utils/time'
-import { BetterStackClient } from './client'
-import { SourcesAPI } from './sources'
+import type { LogEntry, QueryOptions } from "../types";
+import { getQueryCredentials, loadConfig, resolveSourceAlias } from "../utils/config";
+import { parseTimeString, toClickHouseDateTime } from "../utils/time";
+import { BetterStackClient } from "./client";
+import { SourcesAPI } from "./sources";
 
-const VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
+const VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function escapeSqlString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "''")
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
 
 export class QueryAPI {
-  private client: BetterStackClient
-  private sourcesAPI: SourcesAPI
+  private client: BetterStackClient;
+  private sourcesAPI: SourcesAPI;
 
   constructor() {
-    this.client = new BetterStackClient()
-    this.sourcesAPI = new SourcesAPI()
+    this.client = new BetterStackClient();
+    this.sourcesAPI = new SourcesAPI();
   }
 
   private buildJsonPath(field: string): string {
-    const trimmed = field.trim()
-    if (trimmed.startsWith('$')) {
-      return trimmed
+    const trimmed = field.trim();
+    if (trimmed.startsWith("$")) {
+      return trimmed;
     }
 
-    const segments: string[] = []
-    let buffer = ''
-    let inBracket = false
-    let quoteChar: string | null = null
+    const segments: string[] = [];
+    let buffer = "";
+    let inBracket = false;
+    let quoteChar: string | null = null;
 
     const flushPlain = () => {
-      const segment = buffer.trim()
+      const segment = buffer.trim();
       if (segment) {
-        segments.push(segment)
+        segments.push(segment);
       }
-      buffer = ''
-    }
+      buffer = "";
+    };
 
     const flushBracket = () => {
       if (buffer) {
-        segments.push(buffer)
+        segments.push(buffer);
       }
-      buffer = ''
-    }
+      buffer = "";
+    };
 
     for (let index = 0; index < trimmed.length; index += 1) {
-      const char = trimmed.charAt(index)
+      const char = trimmed.charAt(index);
 
       if (!inBracket) {
-        if (char === '.') {
-          flushPlain()
-          continue
+        if (char === ".") {
+          flushPlain();
+          continue;
         }
 
-        if (char === '[') {
-          flushPlain()
-          inBracket = true
-          buffer = '['
-          quoteChar = null
-          continue
+        if (char === "[") {
+          flushPlain();
+          inBracket = true;
+          buffer = "[";
+          quoteChar = null;
+          continue;
         }
 
-        buffer += char
-        continue
+        buffer += char;
+        continue;
       }
 
-      buffer += char
+      buffer += char;
 
       if (char === '"' || char === "'") {
-        const previous = trimmed[index - 1]
-        if (quoteChar === char && previous !== '\\') {
-          quoteChar = null
+        const previous = trimmed[index - 1];
+        if (quoteChar === char && previous !== "\\") {
+          quoteChar = null;
         } else if (!quoteChar) {
-          quoteChar = char
+          quoteChar = char;
         }
-      } else if (char === ']' && !quoteChar) {
-        flushBracket()
-        inBracket = false
+      } else if (char === "]" && !quoteChar) {
+        flushBracket();
+        inBracket = false;
       }
     }
 
     if (buffer) {
       if (inBracket) {
-        segments.push(buffer)
+        segments.push(buffer);
       } else {
-        flushPlain()
+        flushPlain();
       }
     }
 
-    let path = '$'
+    let path = "$";
     for (const segment of segments) {
       if (!segment) {
-        continue
+        continue;
       }
 
-      if (segment.startsWith('[')) {
-        path += this.normalizeBracketSegment(segment)
+      if (segment.startsWith("[")) {
+        path += this.normalizeBracketSegment(segment);
       } else {
-        path += this.normalizePlainSegment(segment)
+        path += this.normalizePlainSegment(segment);
       }
     }
 
-    return path
+    return path;
   }
 
   private buildJsonAccessor(field: string): string {
-    const path = this.buildJsonPath(field)
-    return `JSON_VALUE(raw, '${path}')`
+    const path = this.buildJsonPath(field);
+    return `JSON_VALUE(raw, '${path}')`;
   }
 
   private normalizePlainSegment(segment: string): string {
-    const cleaned = segment.trim()
+    const cleaned = segment.trim();
     if (!cleaned) {
-      return ''
+      return "";
     }
 
     if (VALID_IDENTIFIER_REGEX.test(cleaned)) {
-      return `.${cleaned}`
+      return `.${cleaned}`;
     }
 
-    const escaped = cleaned.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    return `["${escaped}"]`
+    const escaped = cleaned.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `["${escaped}"]`;
   }
 
   private normalizeBracketSegment(segment: string): string {
-    if (!segment.startsWith('[') || !segment.endsWith(']')) {
-      return this.normalizePlainSegment(segment)
+    if (!segment.startsWith("[") || !segment.endsWith("]")) {
+      return this.normalizePlainSegment(segment);
     }
 
-    const inner = segment.slice(1, -1).trim()
+    const inner = segment.slice(1, -1).trim();
     if (!inner) {
-      return segment
+      return segment;
     }
 
-    if (inner === '*') {
-      return '[*]'
+    if (inner === "*") {
+      return "[*]";
     }
 
-    const quote = inner[0]
-    const isQuoted = quote === '"' || quote === "'"
+    const quote = inner[0];
+    const isQuoted = quote === '"' || quote === "'";
     if (isQuoted && inner[inner.length - 1] === quote) {
-      const key = inner.slice(1, -1).replace(/\\(['"])/g, '$1')
-      const escaped = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      return `["${escaped}"]`
+      const key = inner.slice(1, -1).replace(/\\(['"])/g, "$1");
+      const escaped = key.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      return `["${escaped}"]`;
     }
 
     if (/^-?\d+$/.test(inner)) {
-      return `[${inner}]`
+      return `[${inner}]`;
     }
 
-    const escaped = inner.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    return `["${escaped}"]`
+    const escaped = inner.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `["${escaped}"]`;
   }
 
   async buildQuery(options: QueryOptions): Promise<string> {
-    const config = loadConfig()
+    const config = loadConfig();
     const configLevel =
-      config.defaultLogLevel && config.defaultLogLevel.toLowerCase() !== 'all'
+      config.defaultLogLevel && config.defaultLogLevel.toLowerCase() !== "all"
         ? config.defaultLogLevel
-        : undefined
-    const effectiveLevel = options.level ?? configLevel
+        : undefined;
+    const effectiveLevel = options.level ?? configLevel;
 
-    const rawSourceName = options.source || config.defaultSource
-    const sourceName = resolveSourceAlias(rawSourceName)
+    const rawSourceName = options.source || config.defaultSource;
+    const sourceName = resolveSourceAlias(rawSourceName);
 
     if (!sourceName) {
       throw new Error(
-        'No source specified. Use --source or set a default source with: bslog config source <name>',
-      )
+        "No source specified. Use --source or set a default source with: bslog config source <name>",
+      );
     }
 
     // Get source to find the table name
-    const source = await this.sourcesAPI.findByName(sourceName)
+    const source = await this.sourcesAPI.findByName(sourceName);
     if (!source) {
-      throw new Error(`Source not found: ${sourceName}`)
+      throw new Error(`Source not found: ${sourceName}`);
     }
 
     // Build the SQL query using team_id and table_name from the source
-    const tableName = `t${source.attributes.team_id}_${source.attributes.table_name}_logs`
+    const tableName = `t${source.attributes.team_id}_${source.attributes.table_name}_logs`;
     const fields =
       options.fields && options.fields.length > 0
         ? this.buildFieldSelection(options.fields)
-        : 'dt, raw'
+        : "dt, raw";
 
-    let sql = `SELECT ${fields} FROM remote(${tableName})`
+    let sql = `SELECT ${fields} FROM remote(${tableName})`;
 
     // Build WHERE clause
-    const conditions: string[] = []
+    const conditions: string[] = [];
 
     if (options.since) {
-      const sinceDate = parseTimeString(options.since)
-      conditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`)
+      const sinceDate = parseTimeString(options.since);
+      conditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
     }
 
     if (options.until) {
-      const untilDate = parseTimeString(options.until)
-      conditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`)
+      const untilDate = parseTimeString(options.until);
+      conditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
     }
 
     if (effectiveLevel) {
-      const escapedLevel = effectiveLevel.replace(/'/g, "''").toLowerCase()
+      const escapedLevel = effectiveLevel.replace(/'/g, "''").toLowerCase();
       const levelExpression =
         `lowerUTF8(COALESCE(` +
         `JSONExtractString(raw, 'level'),` +
         `JSON_VALUE(raw, '$.level'),` +
         `JSON_VALUE(raw, '$.levelName'),` +
         `JSON_VALUE(raw, '$.vercel.level')
-      ))`
-      const messageExpression = `COALESCE(JSONExtractString(raw, 'message'), JSON_VALUE(raw, '$.message'))`
-      const statusExpression = `toInt32OrZero(JSON_VALUE(raw, '$.vercel.proxy.status_code'))`
+      ))`;
+      const messageExpression = `COALESCE(JSONExtractString(raw, 'message'), JSON_VALUE(raw, '$.message'))`;
+      const statusExpression = `toInt32OrZero(JSON_VALUE(raw, '$.vercel.proxy.status_code'))`;
 
-      if (escapedLevel === 'error') {
+      if (escapedLevel === "error") {
         conditions.push(
           `(${levelExpression} = '${escapedLevel}' OR ${statusExpression} >= 500 OR positionCaseInsensitive(${messageExpression}, 'error') > 0 OR JSONHas(raw, 'error'))`,
-        )
-      } else if (escapedLevel === 'warning' || escapedLevel === 'warn') {
+        );
+      } else if (escapedLevel === "warning" || escapedLevel === "warn") {
         conditions.push(
           `(${levelExpression} IN ('${escapedLevel}', 'warning', 'warn') OR (${statusExpression} >= 400 AND ${statusExpression} < 500))`,
-        )
+        );
       } else {
-        conditions.push(`${levelExpression} = '${escapedLevel}'`)
+        conditions.push(`${levelExpression} = '${escapedLevel}'`);
       }
     }
 
     if (options.subsystem) {
-      const subsystemAccessor = this.buildJsonAccessor('subsystem')
-      conditions.push(`${subsystemAccessor} = '${escapeSqlString(options.subsystem)}'`)
+      const subsystemAccessor = this.buildJsonAccessor("subsystem");
+      conditions.push(`${subsystemAccessor} = '${escapeSqlString(options.subsystem)}'`);
     }
 
     if (options.search) {
-      conditions.push(`raw LIKE '%${escapeSqlString(options.search)}%'`)
+      conditions.push(`raw LIKE '%${escapeSqlString(options.search)}%'`);
     }
 
     if (options.where) {
       for (const [key, value] of Object.entries(options.where)) {
-        const accessor = this.buildJsonAccessor(key)
+        const accessor = this.buildJsonAccessor(key);
 
         if (value === null) {
-          conditions.push(`${accessor} IS NULL`)
-          continue
+          conditions.push(`${accessor} IS NULL`);
+          continue;
         }
 
-        if (typeof value === 'string') {
-          conditions.push(`${accessor} = '${escapeSqlString(value)}'`)
+        if (typeof value === "string") {
+          conditions.push(`${accessor} = '${escapeSqlString(value)}'`);
         } else {
-          const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value)
-          conditions.push(`${accessor} = '${escapeSqlString(serialized)}'`)
+          const serialized = typeof value === "object" ? JSON.stringify(value) : String(value);
+          conditions.push(`${accessor} = '${escapeSqlString(serialized)}'`);
         }
       }
     }
 
     if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(' AND ')}`
+      sql += ` WHERE ${conditions.join(" AND ")}`;
     }
 
     // Add ORDER BY and LIMIT
-    sql += ' ORDER BY dt DESC'
-    sql += ` LIMIT ${options.limit || config.defaultLimit || 100}`
-    sql += ' FORMAT JSONEachRow'
+    sql += " ORDER BY dt DESC";
+    sql += ` LIMIT ${options.limit || config.defaultLimit || 100}`;
+    sql += " FORMAT JSONEachRow";
 
-    return sql
+    return sql;
   }
 
   private buildFieldSelection(fields: string[]): string {
-    const selections: string[] = ['dt']
+    const selections: string[] = ["dt"];
 
     for (const field of fields) {
-      if (field === '*' || field === 'raw') {
-        selections.push('raw')
-        continue
+      if (field === "*" || field === "raw") {
+        selections.push("raw");
+        continue;
       }
 
-      if (field === 'dt') {
-        continue
+      if (field === "dt") {
+        continue;
       }
 
-      const accessor = this.buildJsonAccessor(field)
-      const escapedAlias = field.replace(/"/g, '""')
-      selections.push(`${accessor} AS "${escapedAlias}"`)
+      const accessor = this.buildJsonAccessor(field);
+      const escapedAlias = field.replace(/"/g, '""');
+      selections.push(`${accessor} AS "${escapedAlias}"`);
     }
 
-    return selections.join(', ')
+    return selections.join(", ");
   }
 
   async execute(options: QueryOptions): Promise<LogEntry[]> {
-    const sql = await this.buildQuery(options)
+    const sql = await this.buildQuery(options);
 
     // Only show SQL query in verbose mode
     if (options.verbose) {
-      console.error(`Executing query: ${sql}`)
+      console.error(`Executing query: ${sql}`);
     }
 
-    const { username, password } = getQueryCredentials()
-    return this.client.query<LogEntry>(sql, username, password)
+    const { username, password } = getQueryCredentials();
+    return this.client.query<LogEntry>(sql, username, password);
   }
 
   executeSql(sql: string): Promise<Record<string, unknown>[]> {
-    let statement = sql
-    if (!statement.toLowerCase().includes('format')) {
-      statement = `${statement} FORMAT JSONEachRow`
+    let statement = sql;
+    if (!statement.toLowerCase().includes("format")) {
+      statement = `${statement} FORMAT JSONEachRow`;
     }
 
-    const { username, password } = getQueryCredentials()
-    return this.client.query<Record<string, unknown>>(statement, username, password)
+    const { username, password } = getQueryCredentials();
+    return this.client.query<Record<string, unknown>>(statement, username, password);
   }
 }
