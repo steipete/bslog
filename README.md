@@ -153,6 +153,18 @@ export BETTERSTACK_QUERY_USERNAME="your_username_here"
 export BETTERSTACK_QUERY_PASSWORD="your_password_here"
 ```
 
+#### Custom Query API region (optional)
+
+Better Stack runs Query API endpoints in multiple clusters (e.g. `eu-nbg-2`, `eu-fsn-3`, `us-…`). bslog defaults to `https://eu-nbg-2-connect.betterstackdata.com`. **Credentials are region-scoped** — a username/password issued for one cluster returns HTTP 403 `AUTHENTICATION_FAILED` against another, even when the values are otherwise valid.
+
+If your team's data lives outside the default cluster, set the host explicitly:
+
+```bash
+export BSLOG_QUERY_HOST="https://eu-fsn-3-connect.betterstackdata.com"
+```
+
+The cluster URL is shown next to your credentials under **Logs > Dashboards > Connect remotely** (the SQL API tab in the latest UI).
+
 ### 3. Complete Setup Example
 
 Add all three environment variables to your shell configuration:
