@@ -1,6 +1,6 @@
 {
   "name": "@steipete/bslog",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Better Stack log query CLI with GraphQL-inspired syntax",
   "keywords": [
     "betterstack",
@@ -27,7 +27,7 @@
     "doc": "docs"
   },
   "files": [
-    "dist/",
+    "dist/index.js",
     "README.md"
   ],
   "type": "module",
@@ -36,13 +36,15 @@
     "dev": "bun run src/index.ts",
     "build": "bun build ./src/index.ts --compile --outfile dist/bslog",
     "build:npm": "bun build ./src/index.ts --target node --outfile dist/index.js && chmod +x dist/index.js",
+    "build:all": "bun run build && bun run build:npm",
     "test": "bun test",
     "test:unit": "bun test src/__tests__/unit",
     "test:integration": "bun test src/__tests__/integration",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "type-check": "tsgo --noEmit",
-    "prepublishOnly": "bun run test && bun run build:npm",
+    "ci": "bun run lint && bun run type-check && bun run test && bun run build:npm",
+    "prepublishOnly": "bun run ci",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "bun run format:check && oxlint --deny-warnings src",
@@ -56,13 +58,13 @@
   },
   "devDependencies": {
     "@types/bun": "^1.3.13",
-    "@types/node": "^25.6.0",
-    "oxfmt": "^0.46.0",
-    "oxlint": "^1.61.0",
+    "@types/node": "^25.6.2",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
     "typescript": "^6.0.3"
   },
   "engines": {
     "bun": ">=1.0.0"
   },
-  "packageManager": "bun@1.2.22"
+  "packageManager": "bun@1.3.13"
 }

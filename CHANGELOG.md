@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [1.5.0] - 2026-05-08
+
 - Added `BSLOG_QUERY_HOST` and `queryBaseUrl` config support so teams whose data lives outside the default `eu-nbg-2` cluster can point bslog at their own Query API region without patching the binary. SQL API credentials are region-scoped (`eu-nbg-2` / `eu-fsn-3` / etc.), so credentials issued for one cluster previously returned HTTP 403 `AUTHENTICATION_FAILED` against another. Default behavior is unchanged.
+- Added GitHub Actions CI for linting, type-checking, testing, and npm bundle verification.
+- Reduced the npm package to the shipped Node entrypoint instead of including the standalone Bun binary.
+- Updated dev tooling to `@types/node` 25.6.2, `oxfmt` 0.48.0, `oxlint` 1.63.0, and the Bun package manager pin to 1.3.13.
 
 ## [1.4.0] - 2025-10-16
 
