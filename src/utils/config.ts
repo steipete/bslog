@@ -6,6 +6,8 @@ import type { Config } from "../types";
 const CONFIG_DIR = join(homedir(), ".bslog");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
+export const DEFAULT_QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
+
 export function getApiToken(): string {
   const token = process.env.BETTERSTACK_API_TOKEN;
   if (!token) {

@@ -6,29 +6,15 @@ var __getProtoOf = Object.getPrototypeOf;
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-function __accessProp(key) {
-  return this[key];
-}
-var __toESMCache_node;
-var __toESMCache_esm;
 var __toESM = (mod, isNodeMode, target) => {
-  var canCache = mod != null && typeof mod === "object";
-  if (canCache) {
-    var cache = isNodeMode ? __toESMCache_node ??= new WeakMap : __toESMCache_esm ??= new WeakMap;
-    var cached = cache.get(mod);
-    if (cached)
-      return cached;
-  }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames(mod))
     if (!__hasOwnProp.call(to, key))
       __defProp(to, key, {
-        get: __accessProp.bind(mod, key),
+        get: () => mod[key],
         enumerable: true
       });
-  if (canCache)
-    cache.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -3040,7 +3026,7 @@ var require_colors = __commonJS((exports, module) => {
   colors.stripColors = colors.strip = function(str) {
     return ("" + str).replace(/\x1B\[\d+m/g, "");
   };
-  var stylize = colors.stylize = function stylize2(str, style) {
+  var stylize = colors.stylize = function stylize(str, style) {
     if (!colors.enabled) {
       return str + "";
     }
@@ -3058,8 +3044,8 @@ var require_colors = __commonJS((exports, module) => {
     return str.replace(matchOperatorsRe, "\\$&");
   };
   function build(_styles) {
-    var builder = function builder2() {
-      return applyStyle3.apply(builder2, arguments);
+    var builder = function builder() {
+      return applyStyle3.apply(builder, arguments);
     };
     builder._styles = _styles;
     builder.__proto__ = proto3;
@@ -3078,7 +3064,7 @@ var require_colors = __commonJS((exports, module) => {
     });
     return ret;
   }();
-  var proto3 = defineProps(function colors2() {}, styles4);
+  var proto3 = defineProps(function colors() {}, styles4);
   function applyStyle3() {
     var args = Array.prototype.slice.call(arguments);
     var str = args.map(function(arg) {
@@ -3137,7 +3123,7 @@ var require_colors = __commonJS((exports, module) => {
     });
     return ret;
   }
-  var sequencer = function sequencer2(map2, str) {
+  var sequencer = function sequencer(map2, str) {
     var exploded = str.split("");
     exploded = exploded.map(map2);
     return exploded.join("");
@@ -4537,6 +4523,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 var CONFIG_DIR = join(homedir(), ".bslog");
 var CONFIG_FILE = join(CONFIG_DIR, "config.json");
+var DEFAULT_QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
 function getApiToken() {
   const token = process.env.BETTERSTACK_API_TOKEN;
   if (!token) {
@@ -4618,7 +4605,7 @@ function resolveSourceAlias(source) {
 
 // src/commands/config.ts
 function setConfig(key, value) {
-  const validKeys = ["source", "limit", "format", "logLevel"];
+  const validKeys = ["source", "limit", "format", "logLevel", "queryBaseUrl"];
   if (!validKeys.includes(key)) {
     console.error(source_default2.red(`Invalid config key: ${key}`));
     console.error(`Valid keys: ${validKeys.join(", ")}`);
@@ -4667,6 +4654,16 @@ function setConfig(key, value) {
       console.log(source_default2.green(`Default log level set to: ${resolved}`));
       break;
     }
+    case "queryBaseUrl": {
+      const url = value.trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        console.error(source_default2.red("queryBaseUrl must start with http:// or https://"));
+        process.exit(1);
+      }
+      updateConfig({ queryBaseUrl: url });
+      console.log(source_default2.green(`Query base URL set to: ${url}`));
+      break;
+    }
   }
 }
 function showConfig(options = {}) {
@@ -4677,6 +4674,7 @@ function showConfig(options = {}) {
       defaultLimit: config.defaultLimit ?? 100,
       defaultLogLevel: config.defaultLogLevel ?? "all",
       outputFormat: config.outputFormat ?? "json",
+      queryBaseUrl: config.queryBaseUrl ?? DEFAULT_QUERY_BASE_URL,
       savedQueries: config.savedQueries ?? {},
       queryHistory: config.queryHistory ?? []
     };
@@ -4690,6 +4688,7 @@ Current Configuration:
   console.log(`Default Limit: ${config.defaultLimit || 100}`);
   console.log(`Default Log Level: ${config.defaultLogLevel || "all"}`);
   console.log(`Output Format: ${config.outputFormat || "json"}`);
+  console.log(`Query Base URL: ${config.queryBaseUrl || DEFAULT_QUERY_BASE_URL}`);
   if (config.savedQueries && Object.keys(config.savedQueries).length > 0) {
     console.log(source_default2.bold(`
 Saved Queries:`));
@@ -4737,7 +4736,9 @@ function toClickHouseDateTime(date) {
 
 // src/api/client.ts
 var TELEMETRY_BASE_URL = "https://telemetry.betterstack.com/api/v1";
-var QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
+function resolveQueryBaseUrl(config = loadConfig()) {
+  return process.env.BSLOG_QUERY_HOST || config.queryBaseUrl || DEFAULT_QUERY_BASE_URL;
+}
 var DEFAULT_TIMEOUT_MS = 30000;
 
 class BetterStackClient {
@@ -4785,7 +4786,7 @@ class BetterStackClient {
     const { signal, dispose } = createRequestSignal(undefined, DEFAULT_TIMEOUT_MS);
     let response;
     try {
-      response = await fetch(QUERY_BASE_URL, {
+      response = await fetch(resolveQueryBaseUrl(), {
         method: "POST",
         headers,
         body: sql,
@@ -6514,7 +6515,7 @@ sources.command("get").argument("<name>", "Source name").option("-f, --format <t
   await getSource(name, options);
 });
 var config = program2.command("config").description("Manage configuration");
-config.command("set").argument("<key>", "Configuration key (source|limit|format)").argument("<value>", "Configuration value").description("Set a configuration value").action((key, value) => {
+config.command("set").argument("<key>", "Configuration key (source|limit|format|logLevel|queryBaseUrl)").argument("<value>", "Configuration value").description("Set a configuration value").action((key, value) => {
   setConfig(key, value);
 });
 config.command("show").option("-f, --format <type>", "Output format (json|pretty)", "pretty").description("Show current configuration").action((options) => {

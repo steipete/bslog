@@ -153,6 +153,27 @@ export BETTERSTACK_QUERY_USERNAME="your_username_here"
 export BETTERSTACK_QUERY_PASSWORD="your_password_here"
 ```
 
+#### Custom Query API region (optional)
+
+Better Stack runs Query API endpoints in multiple clusters (e.g. `eu-nbg-2`, `eu-fsn-3`, `us-…`). bslog defaults to `https://eu-nbg-2-connect.betterstackdata.com`. **Credentials are region-scoped** — a username/password issued for one cluster returns HTTP 403 `AUTHENTICATION_FAILED` against another, even when the values are otherwise valid.
+
+If your team's data lives outside the default cluster, set the host explicitly for
+the current shell:
+
+```bash
+export BSLOG_QUERY_HOST="https://eu-fsn-3-connect.betterstackdata.com"
+```
+
+Or save it in bslog's config:
+
+```bash
+bslog config set queryBaseUrl https://eu-fsn-3-connect.betterstackdata.com
+```
+
+`BSLOG_QUERY_HOST` takes precedence over `queryBaseUrl`, so direnv/CI can override
+a saved default. The cluster URL is shown next to your credentials under
+**Logs > Dashboards > Connect remotely** (the SQL API tab in the latest UI).
+
 ### 3. Complete Setup Example
 
 Add all three environment variables to your shell configuration:
@@ -461,16 +482,18 @@ bslog query "{ logs(limit: 10) { * } }" --source staging
 bslog config set <key> <value>
 
 Keys:
-  source    Default source name
-  limit     Default query limit
-  format    Default output format (json|table|csv|pretty)
-  logLevel  Default log level fallback (all|debug|info|warning|error|fatal|trace)
+  source        Default source name
+  limit         Default query limit
+  format        Default output format (json|table|csv|pretty)
+  logLevel      Default log level fallback (all|debug|info|warning|error|fatal|trace)
+  queryBaseUrl  ClickHouse Query API endpoint URL (default: https://eu-nbg-2-connect.betterstackdata.com)
 
 Examples:
   bslog config set source my-app-production
   bslog config set limit 200
   bslog config set format pretty
   bslog config set logLevel warning
+  bslog config set queryBaseUrl https://eu-fsn-3-connect.betterstackdata.com
 ```
 
 #### `config show` - Show current configuration

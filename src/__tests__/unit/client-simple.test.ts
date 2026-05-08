@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { resolveQueryBaseUrl } from "../../api/client";
 
 describe("Client Error Messages", () => {
   let originalEnv: Record<string, string | undefined>;
@@ -9,6 +10,7 @@ describe("Client Error Messages", () => {
       BETTERSTACK_API_TOKEN: process.env.BETTERSTACK_API_TOKEN,
       BETTERSTACK_QUERY_USERNAME: process.env.BETTERSTACK_QUERY_USERNAME,
       BETTERSTACK_QUERY_PASSWORD: process.env.BETTERSTACK_QUERY_PASSWORD,
+      BSLOG_QUERY_HOST: process.env.BSLOG_QUERY_HOST,
     };
   });
 
@@ -74,6 +76,44 @@ describe("Client Error Messages", () => {
       expect(expectedError).toContain("Go to Better Stack > Logs > Dashboards");
       expect(expectedError).toContain('Click "Connect remotely"');
       expect(expectedError).toContain("export BETTERSTACK_QUERY_USERNAME");
+    });
+  });
+
+  describe("Query API base URL", () => {
+    it("returns the default eu-nbg-2 host when BSLOG_QUERY_HOST is unset", () => {
+      delete process.env.BSLOG_QUERY_HOST;
+
+      expect(resolveQueryBaseUrl({})).toBe("https://eu-nbg-2-connect.betterstackdata.com");
+    });
+
+    it("returns the config URL when BSLOG_QUERY_HOST is unset", () => {
+      delete process.env.BSLOG_QUERY_HOST;
+
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://us-east-1-connect.betterstackdata.com");
+    });
+
+    it("lets BSLOG_QUERY_HOST override config", () => {
+      process.env.BSLOG_QUERY_HOST = "https://eu-fsn-3-connect.betterstackdata.com";
+
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://eu-fsn-3-connect.betterstackdata.com");
+    });
+
+    it("treats an empty BSLOG_QUERY_HOST as unset and falls back to config", () => {
+      process.env.BSLOG_QUERY_HOST = "";
+
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://us-east-1-connect.betterstackdata.com");
     });
   });
 });
