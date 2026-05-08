@@ -4345,7 +4345,7 @@ var package_default = {
     "test:integration": "bun test src/__tests__/integration",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
-    "type-check": "tsgo --noEmit",
+    "type-check": "tsc --noEmit",
     ci: "bun run lint && bun run type-check && bun run test && bun run build:npm",
     prepublishOnly: "bun run ci",
     format: "oxfmt --write .",
