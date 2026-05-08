@@ -187,7 +187,7 @@ const config = program.command("config").description("Manage configuration");
 
 config
   .command("set")
-  .argument("<key>", "Configuration key (source|limit|format)")
+  .argument("<key>", "Configuration key (source|limit|format|logLevel|queryBaseUrl)")
   .argument("<value>", "Configuration value")
   .description("Set a configuration value")
   .action((key, value) => {

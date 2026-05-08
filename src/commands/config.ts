@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { loadConfig, updateConfig } from "../utils/config";
+import { DEFAULT_QUERY_BASE_URL, loadConfig, updateConfig } from "../utils/config";
 import type { OutputFormat } from "../utils/formatter";
 
 type ShowConfigOptions = {
@@ -7,7 +7,7 @@ type ShowConfigOptions = {
 };
 
 export function setConfig(key: string, value: string): void {
-  const validKeys = ["source", "limit", "format", "logLevel"];
+  const validKeys = ["source", "limit", "format", "logLevel", "queryBaseUrl"];
 
   if (!validKeys.includes(key)) {
     console.error(chalk.red(`Invalid config key: ${key}`));
@@ -66,6 +66,18 @@ export function setConfig(key: string, value: string): void {
       console.log(chalk.green(`Default log level set to: ${resolved}`));
       break;
     }
+
+    case "queryBaseUrl": {
+      const url = value.trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        console.error(chalk.red("queryBaseUrl must start with http:// or https://"));
+        process.exit(1);
+      }
+
+      updateConfig({ queryBaseUrl: url });
+      console.log(chalk.green(`Query base URL set to: ${url}`));
+      break;
+    }
   }
 }
 
@@ -78,6 +90,7 @@ export function showConfig(options: ShowConfigOptions = {}): void {
       defaultLimit: config.defaultLimit ?? 100,
       defaultLogLevel: config.defaultLogLevel ?? "all",
       outputFormat: config.outputFormat ?? "json",
+      queryBaseUrl: config.queryBaseUrl ?? DEFAULT_QUERY_BASE_URL,
       savedQueries: config.savedQueries ?? {},
       queryHistory: config.queryHistory ?? [],
     };
@@ -91,6 +104,7 @@ export function showConfig(options: ShowConfigOptions = {}): void {
   console.log(`Default Limit: ${config.defaultLimit || 100}`);
   console.log(`Default Log Level: ${config.defaultLogLevel || "all"}`);
   console.log(`Output Format: ${config.outputFormat || "json"}`);
+  console.log(`Query Base URL: ${config.queryBaseUrl || DEFAULT_QUERY_BASE_URL}`);
 
   if (config.savedQueries && Object.keys(config.savedQueries).length > 0) {
     console.log(chalk.bold("\nSaved Queries:"));

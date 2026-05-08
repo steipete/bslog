@@ -1,22 +1,22 @@
 import type { LogEntry } from "../types";
-import { getApiToken } from "../utils/config";
+import type { Config } from "../types";
+import { DEFAULT_QUERY_BASE_URL, getApiToken, loadConfig } from "../utils/config";
 
 const TELEMETRY_BASE_URL = "https://telemetry.betterstack.com/api/v1";
-const DEFAULT_QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
 
 /**
  * Resolve the Query API base URL.
  *
  * SQL API credentials are region-scoped (eu-nbg-2 / eu-fsn-3 / etc.) — a credential
  * issued for one region returns HTTP 403 `AUTHENTICATION_FAILED` against another.
- * Setting `BSLOG_QUERY_HOST` lets teams whose data lives outside the default
- * cluster point bslog at their own region without patching the binary.
+ * Setting `BSLOG_QUERY_HOST` or `queryBaseUrl` lets teams whose data lives outside
+ * the default cluster point bslog at their own region without patching the binary.
  *
  * Resolved on every call so the value can change between invocations (useful for
  * tests, multi-tenant scripts, and future per-source overrides).
  */
-export function resolveQueryBaseUrl(): string {
-  return process.env.BSLOG_QUERY_HOST || DEFAULT_QUERY_BASE_URL;
+export function resolveQueryBaseUrl(config: Pick<Config, "queryBaseUrl"> = loadConfig()): string {
+  return process.env.BSLOG_QUERY_HOST || config.queryBaseUrl || DEFAULT_QUERY_BASE_URL;
 }
 const DEFAULT_TIMEOUT_MS = 30_000;
 

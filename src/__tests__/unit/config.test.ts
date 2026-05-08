@@ -3,7 +3,13 @@ import { existsSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { showConfig } from "../../commands/config";
-import { addToHistory, loadConfig, saveConfig, updateConfig } from "../../utils/config";
+import {
+  addToHistory,
+  DEFAULT_QUERY_BASE_URL,
+  loadConfig,
+  saveConfig,
+  updateConfig,
+} from "../../utils/config";
 
 describe("Config Utilities", () => {
   const CONFIG_DIR = join(homedir(), ".bslog");
@@ -121,6 +127,22 @@ describe("Config Utilities", () => {
       expect(result.defaultSource).toBe("dev"); // Unchanged
       expect(result.defaultLimit).toBe(200); // Updated
       expect(result.outputFormat).toBe("pretty"); // Updated
+    });
+
+    it("should round-trip a custom queryBaseUrl", () => {
+      saveConfig({
+        defaultLimit: 100,
+        outputFormat: "json" as const,
+      });
+
+      updateConfig({
+        queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+      });
+
+      const result = loadConfig();
+
+      expect(result.queryBaseUrl).toBe("https://us-east-1-connect.betterstackdata.com");
+      expect(result.defaultLimit).toBe(100);
     });
 
     it("should add new properties", () => {
@@ -342,9 +364,26 @@ describe("Config Utilities", () => {
       expect(payload.defaultSource).toBe("api-prod");
       expect(payload.defaultLimit).toBe(250);
       expect(payload.outputFormat).toBe("pretty");
+      expect(payload.queryBaseUrl).toBe(DEFAULT_QUERY_BASE_URL);
       expect(payload.savedQueries.recentErrors).toContain("limit: 20");
       expect(payload.queryHistory).toEqual(sampleConfig.queryHistory);
       expect(errorSpy.mock.calls.length).toBe(0);
+    });
+
+    it("should include custom queryBaseUrl in JSON output", () => {
+      const sampleConfig = {
+        defaultLimit: 100,
+        outputFormat: "json" as const,
+        queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+      };
+
+      saveConfig(sampleConfig);
+      showConfig({ format: "json" });
+
+      expect(logSpy.mock.calls.length).toBe(1);
+      const payload = JSON.parse(logSpy.mock.calls[0][0] as string);
+
+      expect(payload.queryBaseUrl).toBe("https://us-east-1-connect.betterstackdata.com");
     });
   });
 });

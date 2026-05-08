@@ -83,19 +83,37 @@ describe("Client Error Messages", () => {
     it("returns the default eu-nbg-2 host when BSLOG_QUERY_HOST is unset", () => {
       delete process.env.BSLOG_QUERY_HOST;
 
-      expect(resolveQueryBaseUrl()).toBe("https://eu-nbg-2-connect.betterstackdata.com");
+      expect(resolveQueryBaseUrl({})).toBe("https://eu-nbg-2-connect.betterstackdata.com");
     });
 
-    it("returns the override when BSLOG_QUERY_HOST is set", () => {
+    it("returns the config URL when BSLOG_QUERY_HOST is unset", () => {
+      delete process.env.BSLOG_QUERY_HOST;
+
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://us-east-1-connect.betterstackdata.com");
+    });
+
+    it("lets BSLOG_QUERY_HOST override config", () => {
       process.env.BSLOG_QUERY_HOST = "https://eu-fsn-3-connect.betterstackdata.com";
 
-      expect(resolveQueryBaseUrl()).toBe("https://eu-fsn-3-connect.betterstackdata.com");
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://eu-fsn-3-connect.betterstackdata.com");
     });
 
-    it("treats an empty BSLOG_QUERY_HOST as 'unset' and falls back to the default", () => {
+    it("treats an empty BSLOG_QUERY_HOST as unset and falls back to config", () => {
       process.env.BSLOG_QUERY_HOST = "";
 
-      expect(resolveQueryBaseUrl()).toBe("https://eu-nbg-2-connect.betterstackdata.com");
+      expect(
+        resolveQueryBaseUrl({
+          queryBaseUrl: "https://us-east-1-connect.betterstackdata.com",
+        }),
+      ).toBe("https://us-east-1-connect.betterstackdata.com");
     });
   });
 });

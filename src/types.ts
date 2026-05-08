@@ -40,6 +40,7 @@ export interface Config {
   defaultLimit?: number;
   outputFormat?: "json" | "table" | "csv" | "pretty";
   defaultLogLevel?: string;
+  queryBaseUrl?: string;
   queryHistory?: string[];
   savedQueries?: Record<string, string>;
 }

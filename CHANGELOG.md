@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Added `BSLOG_QUERY_HOST` environment variable so teams whose data lives outside the default `eu-nbg-2` cluster can point bslog at their own Query API region without patching the binary. SQL API credentials are region-scoped (`eu-nbg-2` / `eu-fsn-3` / etc.), so credentials issued for one cluster previously returned HTTP 403 `AUTHENTICATION_FAILED` against another. Default behavior is unchanged.
+- Added `BSLOG_QUERY_HOST` and `queryBaseUrl` config support so teams whose data lives outside the default `eu-nbg-2` cluster can point bslog at their own Query API region without patching the binary. SQL API credentials are region-scoped (`eu-nbg-2` / `eu-fsn-3` / etc.), so credentials issued for one cluster previously returned HTTP 403 `AUTHENTICATION_FAILED` against another. Default behavior is unchanged.
 
 ## [1.4.0] - 2025-10-16
 
