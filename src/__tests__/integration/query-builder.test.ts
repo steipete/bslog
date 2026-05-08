@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { QueryAPI } from "../../api/query";
 
 // Mock the sources API
@@ -50,6 +50,10 @@ mock.module("../../api/client", () => ({
 
 describe("Query Builder Integration", () => {
   let queryAPI: QueryAPI;
+
+  afterAll(() => {
+    mock.restore();
+  });
 
   beforeEach(() => {
     queryAPI = new QueryAPI();
