@@ -144,9 +144,9 @@ function parseValue(value: string): unknown {
     return value.slice(1, -1);
   }
 
-  // Parse numbers
-  if (/^\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
+  // Parse numbers (integers, negatives, decimals, exponents)
+  if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(value)) {
+    return Number(value);
   }
 
   // Parse booleans

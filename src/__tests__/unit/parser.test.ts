@@ -61,6 +61,20 @@ describe("GraphQL Parser", () => {
       });
     });
 
+    it("should parse numeric where values consistently as numbers", () => {
+      const query =
+        "{ logs(where: { count: 42, temp: -5, ratio: 3.14, delta: -2.5, big: 2.5e3 }) { * } }";
+      const result = parseGraphQLQuery(query);
+
+      expect(result.where).toEqual({
+        count: 42,
+        temp: -5,
+        ratio: 3.14,
+        delta: -2.5,
+        big: 2500,
+      });
+    });
+
     it("should parse query with source parameter", () => {
       const query = "{ logs(source: 'production') { dt } }";
       const result = parseGraphQLQuery(query);
