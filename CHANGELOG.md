@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [1.5.1] - 2026-06-10
+
 - Fixed GraphQL `where` numeric literal parsing for signed, decimal, and exponent values while keeping `limit` to intentional 1-10000 integer handling. Thanks @devYRPauli.
 
 ## [1.5.0] - 2026-05-08
