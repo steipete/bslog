@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { DEFAULT_QUERY_BASE_URL, loadConfig, updateConfig } from "../utils/config";
 import type { OutputFormat } from "../utils/formatter";
+import { MAX_QUERY_LIMIT, normalizeLimitValue } from "../utils/limits";
 
 type ShowConfigOptions = {
   format?: string;
@@ -22,9 +23,9 @@ export function setConfig(key: string, value: string): void {
       break;
 
     case "limit": {
-      const limit = Number.parseInt(value, 10);
-      if (Number.isNaN(limit) || limit < 1) {
-        console.error(chalk.red("Limit must be a positive number"));
+      const limit = normalizeLimitValue(value);
+      if (limit === undefined) {
+        console.error(chalk.red(`Limit must be an integer between 1 and ${MAX_QUERY_LIMIT}`));
         process.exit(1);
       }
       updateConfig({ defaultLimit: limit });

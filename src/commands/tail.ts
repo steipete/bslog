@@ -4,6 +4,7 @@ import { QueryAPI } from "../api/query";
 import type { LogEntry, QueryOptions } from "../types";
 import { loadConfig, resolveSourceAlias } from "../utils/config";
 import { formatOutput, type OutputFormat } from "../utils/formatter";
+import { DEFAULT_QUERY_LIMIT, normalizeLimitValue } from "../utils/limits";
 
 type JqRunner = typeof spawnSync;
 let jqRunner: JqRunner = spawnSync;
@@ -287,10 +288,7 @@ function resolveInterval(value?: number | string): number {
 }
 
 function normalizeLimit(limit?: number): number {
-  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
-    return Math.floor(limit);
-  }
-  return 100;
+  return normalizeLimitValue(limit) ?? DEFAULT_QUERY_LIMIT;
 }
 
 function normalizeFieldsOption(fields?: string | string[]): string[] | undefined {

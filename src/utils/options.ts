@@ -1,4 +1,5 @@
 import type { QueryOptions } from "../types";
+import { normalizeLimitValue } from "./limits";
 
 type MaybeString = string | undefined;
 
@@ -32,18 +33,7 @@ export function normalizeSourcesOption(input?: string | string[]): string[] | un
 }
 
 export function parseLimitOption(rawValue: unknown): number | undefined {
-  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
-    return Math.floor(rawValue);
-  }
-
-  if (typeof rawValue === "string") {
-    const parsed = Number.parseInt(rawValue, 10);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-
-  return undefined;
+  return normalizeLimitValue(rawValue);
 }
 
 export function parseWhereOption(input?: string | string[]): Record<string, unknown> | undefined {

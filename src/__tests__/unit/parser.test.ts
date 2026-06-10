@@ -61,18 +61,68 @@ describe("GraphQL Parser", () => {
       });
     });
 
-    it("should parse numeric where values consistently as numbers", () => {
+    it("should parse signed decimal and exponent where values as numbers", () => {
       const query =
-        "{ logs(where: { count: 42, temp: -5, ratio: 3.14, delta: -2.5, big: 2.5e3 }) { * } }";
+        "{ logs(where: { count: 42, temp: -5, plus: +7, ratio: 3.14, delta: -2.5, big: 2.5e3, tiny: -6E-2 }) { * } }";
       const result = parseGraphQLQuery(query);
 
       expect(result.where).toEqual({
         count: 42,
         temp: -5,
+        plus: 7,
         ratio: 3.14,
         delta: -2.5,
         big: 2500,
+        tiny: -0.06,
       });
+    });
+
+    it("should keep quoted numeric where values as strings", () => {
+      const query =
+        "{ logs(where: { count: '42', temp: \"-5\", ratio: '3.14', big: \"2.5e3\" }) { * } }";
+      const result = parseGraphQLQuery(query);
+
+      expect(result.where).toEqual({
+        count: "42",
+        temp: "-5",
+        ratio: "3.14",
+        big: "2.5e3",
+      });
+    });
+
+    it("should keep invalid numeric where values as strings", () => {
+      const query =
+        "{ logs(where: { leadingDecimal: .5, trailingDecimal: 1., exponent: 1e, exponentSign: 1e+, doubledSign: --1 }) { * } }";
+      const result = parseGraphQLQuery(query);
+
+      expect(result.where).toEqual({
+        leadingDecimal: ".5",
+        trailingDecimal: "1.",
+        exponent: "1e",
+        exponentSign: "1e+",
+        doubledSign: "--1",
+      });
+    });
+
+    it("should accept top-level integer limit values within range", () => {
+      expect(parseGraphQLQuery("{ logs(limit: 1) { * } }").limit).toBe(1);
+      expect(parseGraphQLQuery("{ logs(limit: 10000) { * } }").limit).toBe(10000);
+      expect(parseGraphQLQuery("{ logs(limit: '25') { * } }").limit).toBe(25);
+    });
+
+    it("should ignore invalid top-level limit values", () => {
+      const queries = [
+        "{ logs(limit: 0) { * } }",
+        "{ logs(limit: -5) { * } }",
+        "{ logs(limit: 1.5) { * } }",
+        "{ logs(limit: 1e3) { * } }",
+        "{ logs(limit: 10001) { * } }",
+        "{ logs(limit: 9007199254740992) { * } }",
+      ];
+
+      for (const query of queries) {
+        expect(parseGraphQLQuery(query).limit).toBeUndefined();
+      }
     });
 
     it("should parse query with source parameter", () => {
