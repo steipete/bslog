@@ -1,5 +1,6 @@
 import type { LogEntry, QueryOptions } from "../types";
 import { getQueryCredentials, loadConfig, resolveSourceAlias } from "../utils/config";
+import { resolveQueryLimit } from "../utils/limits";
 import { parseTimeString, toClickHouseDateTime } from "../utils/time";
 import { BetterStackClient } from "./client";
 import { SourcesAPI } from "./sources";
@@ -257,7 +258,7 @@ export class QueryAPI {
 
     // Add ORDER BY and LIMIT
     sql += " ORDER BY dt DESC";
-    sql += ` LIMIT ${options.limit || config.defaultLimit || 100}`;
+    sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
     sql += " FORMAT JSONEachRow";
 
     return sql;

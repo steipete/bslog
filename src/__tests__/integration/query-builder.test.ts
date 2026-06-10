@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { QueryAPI } from "../../api/query";
+import { parseGraphQLQuery } from "../../parser/graphql";
 
 // Mock the sources API
 mock.module("../../api/sources", () => ({
@@ -302,6 +303,56 @@ describe("Query Builder Integration", () => {
       });
 
       expect(sql).toContain("LIMIT 100");
+    });
+
+    it("should use default limit for direct invalid limit values", async () => {
+      const invalidLimits = [0, -5, 1.5, 10001, Number.MAX_SAFE_INTEGER + 1];
+
+      for (const limit of invalidLimits) {
+        const sql = await queryAPI.buildQuery({
+          source: "test-source",
+          limit,
+        });
+
+        expect(sql).toContain("LIMIT 100");
+      }
+    });
+
+    it("should allow direct limit values at range boundaries", async () => {
+      const minSql = await queryAPI.buildQuery({
+        source: "test-source",
+        limit: 1,
+      });
+      const maxSql = await queryAPI.buildQuery({
+        source: "test-source",
+        limit: 10000,
+      });
+
+      expect(minSql).toContain("LIMIT 1");
+      expect(maxSql).toContain("LIMIT 10000");
+    });
+
+    it("should reject invalid GraphQL limit inputs before SQL LIMIT", async () => {
+      const invalidQueries = [
+        "{ logs(limit: 0) { * } }",
+        "{ logs(limit: -5) { * } }",
+        "{ logs(limit: 1.5) { * } }",
+        "{ logs(limit: 1e3) { * } }",
+        "{ logs(limit: 10001) { * } }",
+      ];
+
+      for (const query of invalidQueries) {
+        const sql = await queryAPI.buildQuery({
+          source: "test-source",
+          ...parseGraphQLQuery(query),
+        });
+
+        expect(sql).toContain("LIMIT 100");
+        expect(sql).not.toContain("LIMIT -5");
+        expect(sql).not.toContain("LIMIT 1.5");
+        expect(sql).not.toContain("LIMIT 1000");
+        expect(sql).not.toContain("LIMIT 10001");
+      }
     });
 
     it("should throw error when source is not found", async () => {

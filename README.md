@@ -276,6 +276,7 @@ bslog query "{ logs(subsystem: 'api', limit: 100) { dt, message } }"
 
 # Filter by custom fields
 bslog query "{ logs(where: { userId: '12345' }) { * } }"
+bslog query "{ logs(where: { durationMs: 12.5, retry: -1 }) { * } }"
 
 # Complex filters
 bslog query "{
@@ -299,6 +300,7 @@ bslog query "{ logs(search: 'database connection') { dt, message } }"
 ### Field Selection
 
 - Use `*` to get all fields
+- `limit` accepts integer values from 1 to 10000; invalid values use the configured default limit.
 - Specify individual fields: `dt, level, message, customField`
 - Access nested JSON fields directly (dot + bracket paths) e.g. `metadata.proxy[0].status`, `metadata["complex key"].value`
 - CLI shortcut: combine `--fields` with compact formatters when you just want to confirm counts, e.g. `bslog errors -n 5 --fields dt,message`.

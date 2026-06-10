@@ -1,4 +1,7 @@
 import type { QueryOptions } from "../types";
+import { normalizeLimitValue } from "../utils/limits";
+
+const NUMERIC_LITERAL_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 
 export function parseGraphQLQuery(query: string): QueryOptions {
   // Remove outer braces and whitespace
@@ -22,14 +25,8 @@ export function parseGraphQLQuery(query: string): QueryOptions {
     // Parse arguments like: limit: 100, level: 'error', where: { ... }
     const args = parseArguments(argsStr);
 
-    const limit =
-      typeof args.limit === "number"
-        ? args.limit
-        : typeof args.limit === "string"
-          ? Number.parseInt(args.limit, 10)
-          : undefined;
-    if (limit !== undefined) {
-      options.limit = limit;
+    if (typeof args.limit === "number") {
+      options.limit = args.limit;
     }
 
     if (typeof args.level === "string") {
@@ -118,7 +115,7 @@ function parseArguments(argsStr: string): Record<string, unknown> {
       currentValue = "";
     } else if (char === "," && depth === 0) {
       if (currentKey) {
-        result[currentKey] = parseValue(currentValue.trim());
+        result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
         currentKey = "";
         currentValue = "";
       }
@@ -129,24 +126,34 @@ function parseArguments(argsStr: string): Record<string, unknown> {
 
   // Handle last key-value pair
   if (currentKey && currentValue) {
-    result[currentKey] = parseValue(currentValue.trim());
+    result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
   }
 
   return result;
 }
 
-function parseValue(value: string): unknown {
-  // Remove quotes from strings
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    return value.slice(1, -1);
+function parseArgumentValue(key: string, value: string): unknown {
+  if (key === "limit") {
+    return parseLimitValue(value);
   }
 
-  // Parse numbers
-  if (/^\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
+  return parseValue(value);
+}
+
+function parseLimitValue(value: string): number | undefined {
+  return normalizeLimitValue(parseQuotedString(value) ?? value);
+}
+
+function parseValue(value: string): unknown {
+  // Remove quotes from strings
+  const quotedString = parseQuotedString(value);
+  if (quotedString !== undefined) {
+    return quotedString;
+  }
+
+  // Parse numbers (integers, negatives, decimals, exponents)
+  if (NUMERIC_LITERAL_PATTERN.test(value)) {
+    return Number(value);
   }
 
   // Parse booleans
@@ -189,6 +196,17 @@ function parseValue(value: string): unknown {
   }
 
   return value;
+}
+
+function parseQuotedString(value: string): string | undefined {
+  if (
+    (value.startsWith("'") && value.endsWith("'")) ||
+    (value.startsWith('"') && value.endsWith('"'))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -181,7 +181,7 @@ apps/bslog/
 
 ### Query Optimization
 
-- Always include LIMIT clause (default: 100, max: 10000)
+- Always include LIMIT clause (default: 100, integer range: 1-10000)
 - Use time-based partitioning for better performance
 - Cache source metadata locally
 

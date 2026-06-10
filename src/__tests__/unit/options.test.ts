@@ -22,10 +22,17 @@ describe("CLI option helpers", () => {
     it("parses numeric values", () => {
       expect(parseLimitOption("200")).toBe(200);
       expect(parseLimitOption(50)).toBe(50);
+      expect(parseLimitOption("10000")).toBe(10000);
     });
 
     it("returns undefined for invalid values", () => {
       expect(parseLimitOption("foo")).toBeUndefined();
+      expect(parseLimitOption("0")).toBeUndefined();
+      expect(parseLimitOption("-5")).toBeUndefined();
+      expect(parseLimitOption("1.5")).toBeUndefined();
+      expect(parseLimitOption("1e3")).toBeUndefined();
+      expect(parseLimitOption("10001")).toBeUndefined();
+      expect(parseLimitOption(1.5)).toBeUndefined();
     });
   });
 
