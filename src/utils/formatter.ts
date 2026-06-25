@@ -119,7 +119,7 @@ function formatTable(data: DisplayRow[]): string {
   for (const entry of data) {
     const row = headers.map((header) => {
       const value = entry[header];
-      if (value === undefined) {
+      if (value === undefined || value === null) {
         return "";
       }
       if (typeof value === "object") {
@@ -156,7 +156,7 @@ function formatCSV(data: DisplayRow[]): string {
   for (const entry of data) {
     const row = headers.map((header) => {
       const value = entry[header];
-      if (value === undefined) {
+      if (value === undefined || value === null) {
         return "";
       }
       if (typeof value === "object") {

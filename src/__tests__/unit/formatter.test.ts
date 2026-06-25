@@ -211,6 +211,11 @@ describe("Formatter", () => {
 
       const csvResult = formatOutput(dataWithNull, "csv");
       expect(csvResult).toContain(",,"); // Empty values for null/undefined
+      // A null cell must be an empty field, not the literal string "null".
+      expect(csvResult).not.toContain("null");
+
+      const tableResult = formatOutput(dataWithNull, "table");
+      expect(tableResult).not.toContain("null");
     });
 
     it("should handle raw field with non-JSON string", () => {
