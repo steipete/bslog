@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.5.2] - Unreleased
 
-No unreleased changes.
+- Fixed `formatCSV` and `formatTable` rendering `null` field values as the literal string `null` instead of an empty field. Because `typeof null === "object"`, a null cell fell through to the JSON-stringify branch; it is now treated like `undefined` and emitted as an empty field. Thanks @devYRPauli.
 
 ## [1.5.1] - 2026-06-10
 
