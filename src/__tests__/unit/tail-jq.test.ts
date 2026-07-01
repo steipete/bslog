@@ -8,6 +8,7 @@ const { QueryAPI } = await import("../../api/query");
 const { tailLogs, __setJqRunnerForTests } = await import("../../commands/tail");
 
 describe("tailLogs jq integration", () => {
+  const originalApiToken = process.env.BETTERSTACK_API_TOKEN;
   const originalExecute = QueryAPI.prototype.execute;
   const originalStdoutWrite = process.stdout.write;
   const originalConsoleLog = console.log;
@@ -21,6 +22,7 @@ describe("tailLogs jq integration", () => {
   );
 
   beforeEach(() => {
+    process.env.BETTERSTACK_API_TOKEN = "test-token";
     stdoutSpy = mock(() => undefined);
     logSpy = mock(() => undefined);
     errorSpy = mock(() => undefined);
@@ -34,6 +36,11 @@ describe("tailLogs jq integration", () => {
   });
 
   afterEach(() => {
+    if (originalApiToken === undefined) {
+      delete process.env.BETTERSTACK_API_TOKEN;
+    } else {
+      process.env.BETTERSTACK_API_TOKEN = originalApiToken;
+    }
     process.stdout.write = originalStdoutWrite;
     console.log = originalConsoleLog;
     console.error = originalConsoleError;

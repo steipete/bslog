@@ -9,6 +9,7 @@ const { QueryAPI } = await import("../../api/query");
 const { tailLogs } = await import("../../commands/tail");
 
 describe("tailLogs multi-source correlation", () => {
+  const originalApiToken = process.env.BETTERSTACK_API_TOKEN;
   const originalLog = console.log;
   const originalError = console.error;
   const originalExecute = QueryAPI.prototype.execute;
@@ -16,6 +17,7 @@ describe("tailLogs multi-source correlation", () => {
   let errorSpy: ReturnType<typeof mock>;
 
   beforeEach(() => {
+    process.env.BETTERSTACK_API_TOKEN = "test-token";
     executeMock.mockReset();
     logSpy = mock(() => undefined);
     errorSpy = mock(() => undefined);
@@ -27,6 +29,11 @@ describe("tailLogs multi-source correlation", () => {
   });
 
   afterEach(() => {
+    if (originalApiToken === undefined) {
+      delete process.env.BETTERSTACK_API_TOKEN;
+    } else {
+      process.env.BETTERSTACK_API_TOKEN = originalApiToken;
+    }
     console.log = originalLog;
     console.error = originalError;
     QueryAPI.prototype.execute = originalExecute;
