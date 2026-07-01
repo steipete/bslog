@@ -4310,7 +4310,7 @@ var package_default = {
   },
   devDependencies: {
     "@types/bun": "^1.3.14",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.0",
     oxfmt: "^0.57.0",
     oxlint: "^1.72.0",
     typescript: "^6.0.3"
