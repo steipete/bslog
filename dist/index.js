@@ -4310,9 +4310,9 @@ var package_default = {
   },
   devDependencies: {
     "@types/bun": "^1.3.14",
-    "@types/node": "^26.0.0",
-    oxfmt: "^0.56.0",
-    oxlint: "^1.71.0",
+    "@types/node": "^26.0.1",
+    oxfmt: "^0.57.0",
+    oxlint: "^1.72.0",
     typescript: "^6.0.3"
   },
   engines: {
@@ -5386,7 +5386,7 @@ function formatTable(data) {
   for (const entry of data) {
     const row = headers.map((header) => {
       const value = entry[header];
-      if (value === undefined) {
+      if (value === undefined || value === null) {
         return "";
       }
       if (typeof value === "object") {
@@ -5414,7 +5414,7 @@ function formatCSV(data) {
   for (const entry of data) {
     const row = headers.map((header) => {
       const value = entry[header];
-      if (value === undefined) {
+      if (value === undefined || value === null) {
         return "";
       }
       if (typeof value === "object") {
