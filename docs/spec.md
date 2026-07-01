@@ -204,7 +204,7 @@ apps/bslog/
 ### Environment Variables
 
 ```bash
-BETTERSTACK_API_TOKEN=Bbu9CBf9JxuePAqTdhETDQZu  # API token
+BETTERSTACK_API_TOKEN=your_telemetry_token_here  # API token
 BSLOG_DEFAULT_SOURCE=sweetistics-dev              # Default source
 BSLOG_DEFAULT_LIMIT=100                          # Default query limit
 BSLOG_OUTPUT_FORMAT=json                         # Default output format
