@@ -4305,8 +4305,7 @@ var package_default = {
   dependencies: {
     chalk: "^5.6.2",
     "cli-table3": "^0.6.5",
-    commander: "^15.0.0",
-    dotenv: "^17.4.2"
+    commander: "^15.0.0"
   },
   devDependencies: {
     "@types/bun": "^1.3.14",
