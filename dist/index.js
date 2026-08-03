@@ -4252,7 +4252,7 @@ var program = new Command;
 // package.json
 var package_default = {
   name: "@steipete/bslog",
-  version: "1.5.1",
+  version: "1.5.2",
   description: "Better Stack log query CLI with GraphQL-inspired syntax",
   keywords: [
     "betterstack",
