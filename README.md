@@ -1,7 +1,7 @@
 # bslog 🔎 — Better Stack logs, without the SQL detour
 
 [![CI](https://img.shields.io/github/actions/workflow/status/steipete/bslog/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/steipete/bslog/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@steipete/bslog?style=flat-square)](https://registry.npmjs.org/@steipete/bslog/latest)
+[![npm](https://img.shields.io/npm/v/@steipete/bslog?style=flat-square)](https://www.npmjs.com/package/@steipete/bslog)
 [![Bun](https://img.shields.io/badge/Bun-%E2%89%A51.0-000000?style=flat-square&logo=bun)](https://bun.sh)
 [![License](https://img.shields.io/github/license/steipete/bslog?style=flat-square)](LICENSE)
 
