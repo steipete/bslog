@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.3] - Unreleased
+
+No unreleased changes.
+
 ## [1.5.2] - 2026-08-02
 
 - Rewrote the README around installation and first use, with authentication and CLI reference details moved into focused docs.
