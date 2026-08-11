@@ -32,6 +32,7 @@ export interface QueryOptions {
   fields?: string[];
   source?: string;
   sources?: string[];
+  hotOnly?: boolean;
   verbose?: boolean;
 }
 

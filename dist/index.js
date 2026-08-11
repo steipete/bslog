@@ -5047,18 +5047,18 @@ class QueryAPI {
     if (!source) {
       throw new Error(`Source not found: ${sourceName}`);
     }
-    const tableName = `t${source.attributes.team_id}_${source.attributes.table_name}_logs`;
+    const tablePrefix = `t${source.attributes.team_id}_${source.attributes.table_name}`;
     const fields = options.fields && options.fields.length > 0 ? this.buildFieldSelection(options.fields) : "dt, raw";
-    let sql = `SELECT ${fields} FROM remote(${tableName})`;
-    const conditions = [];
+    const timeConditions = [];
     if (options.since) {
       const sinceDate = parseTimeString(options.since);
-      conditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
+      timeConditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
     }
     if (options.until) {
       const untilDate = parseTimeString(options.until);
-      conditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
+      timeConditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
     }
+    const conditions = [];
     if (effectiveLevel) {
       const escapedLevel = effectiveLevel.replace(/'/g, "''").toLowerCase();
       const levelExpression = `lowerUTF8(COALESCE(` + `JSONExtractString(raw, 'level'),` + `JSON_VALUE(raw, '$.level'),` + `JSON_VALUE(raw, '$.levelName'),` + `JSON_VALUE(raw, '$.vercel.level')
@@ -5095,8 +5095,20 @@ class QueryAPI {
         }
       }
     }
-    if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(" AND ")}`;
+    let sql;
+    if (options.hotOnly) {
+      sql = `SELECT ${fields} FROM remote(${tablePrefix}_logs)`;
+      const allConditions = [...timeConditions, ...conditions];
+      if (allConditions.length > 0) {
+        sql += ` WHERE ${allConditions.join(" AND ")}`;
+      }
+    } else {
+      const timeWhere = timeConditions.length > 0 ? ` WHERE ${timeConditions.join(" AND ")}` : "";
+      const coldTimeWhere = timeConditions.length > 0 ? ` AND ${timeConditions.join(" AND ")}` : "";
+      sql = `SELECT ${fields} FROM (SELECT dt, raw FROM remote(${tablePrefix}_logs)${timeWhere} UNION ALL SELECT dt, raw FROM s3Cluster(primary, ${tablePrefix}_s3) WHERE _row_type = 1${coldTimeWhere})`;
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(" AND ")}`;
+      }
     }
     sql += " ORDER BY dt DESC";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
@@ -5680,6 +5692,9 @@ async function tailLogs(options) {
   const queryOptions = {
     ...remainingOptions
   };
+  if (follow) {
+    queryOptions.hotOnly = true;
+  }
   const normalizedFields = normalizeFieldsOption(rawFields);
   if (normalizedFields) {
     queryOptions.fields = normalizedFields;
@@ -5956,6 +5971,9 @@ async function tailLogs2(options) {
   const queryOptions = {
     ...remainingOptions
   };
+  if (follow) {
+    queryOptions.hotOnly = true;
+  }
   const normalizedFields = normalizeFieldsOption2(rawFields);
   if (normalizedFields) {
     queryOptions.fields = normalizedFields;
@@ -6356,7 +6374,7 @@ function mergeWithRuntime(options, runtime, extras = {}) {
   return merged;
 }
 function applySharedLogOptions(command) {
-  command.option("-n, --limit <number>", "Number of logs to fetch", "100").option("--since <time>", "Time lower bound (e.g., 1h, 2d, 2024-01-01)").option("--until <time>", "Time upper bound (e.g., 2024-01-01T12:00)").option("--format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--fields <names>", "Comma-separated list of fields to select (e.g., dt,message,level)").option("--sources <names>", "Comma-separated list of sources to merge").option("--where <filter...>", "Filter JSON fields (field=value). Repeat to add multiple filters", collectWhereFilters, []).option("--jq <filter>", "Pipe JSON output through jq (requires jq in PATH)").option("-v, --verbose", "Show SQL query and debug information");
+  command.option("-n, --limit <number>", "Number of logs to fetch", "100").option("--since <time>", "Time lower bound (e.g., 1h, 2d, 2024-01-01)").option("--until <time>", "Time upper bound (e.g., 2024-01-01T12:00)").option("--format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--fields <names>", "Comma-separated list of fields to select (e.g., dt,message,level)").option("--sources <names>", "Comma-separated list of sources to merge").option("--hot-only", "Query hot storage only (faster, excludes archived logs)").option("--where <filter...>", "Filter JSON fields (field=value). Repeat to add multiple filters", collectWhereFilters, []).option("--jq <filter>", "Pipe JSON output through jq (requires jq in PATH)").option("-v, --verbose", "Show SQL query and debug information");
 }
 function stripRuntimeOptionProps(options) {
   const { limit: _limit, sources: _sources, where: _where, jq: _jq, ...rest } = options;
@@ -6389,7 +6407,7 @@ function extractStringOption(options, key) {
   const value = options[key];
   return typeof value === "string" ? value : undefined;
 }
-program2.command("query").argument("<query>", "GraphQL-like query string").option("-s, --source <name>", "Source name").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "pretty").option("-v, --verbose", "Show SQL query and debug information").description("Query logs using GraphQL-like syntax").action(async (query, options) => {
+program2.command("query").argument("<query>", "GraphQL-like query string").option("-s, --source <name>", "Source name").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--hot-only", "Query hot storage only (faster, excludes archived logs)").option("-v, --verbose", "Show SQL query and debug information").description("Query logs using GraphQL-like syntax").action(async (query, options) => {
   await runQuery(query, options);
 });
 program2.command("sql").argument("<sql>", "Raw ClickHouse SQL query").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "json").option("-v, --verbose", "Show SQL query and debug information").description("Execute raw ClickHouse SQL query").action(async (sql, options) => {

@@ -62,6 +62,8 @@ bslog tail my-app-production --follow
 
 Output is available as `pretty`, `json`, `table`, or `csv`. A `--jq` filter switches output to JSON and runs the result through the local `jq` executable.
 
+Normal queries search both hot and archived storage, so bounded historical searches include archived matches. `--limit` still caps the rows returned. Use `--hot-only` when low latency matters more than archived results. `tail --follow` is always hot-only because it polls for new entries.
+
 ## Structured queries
 
 Use the GraphQL-inspired syntax when the query shape is easier to express in one value:
