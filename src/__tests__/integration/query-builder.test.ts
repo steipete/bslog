@@ -68,7 +68,11 @@ describe("Query Builder Integration", () => {
         limit: 50,
       });
 
-      expect(sql).toContain("SELECT dt, raw FROM remote(t123456_test_source_logs)");
+      expect(sql).toContain(
+        "SELECT dt, raw FROM (SELECT dt, raw FROM remote(t123456_test_source_logs)",
+      );
+      expect(sql).toContain("UNION ALL");
+      expect(sql).toContain("s3Cluster(primary, t123456_test_source_s3) WHERE _row_type = 1");
       expect(sql).toContain("ORDER BY dt DESC");
       expect(sql).toContain("LIMIT 50");
       expect(sql).toContain("FORMAT JSONEachRow");
@@ -200,6 +204,49 @@ describe("Query Builder Integration", () => {
 
       expect(sql).toContain("WHERE dt >= toDateTime64");
       expect(sql).toContain("AND dt <= toDateTime64");
+    });
+
+    it("should push time bounds into both storage branches", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        since: "2024-01-01T00:00:00Z",
+        until: "2024-01-02T00:00:00Z",
+      });
+
+      expect(sql).toContain("remote(t123456_test_source_logs) WHERE dt >= toDateTime64");
+      expect(sql).toContain(
+        "s3Cluster(primary, t123456_test_source_s3) WHERE _row_type = 1 AND dt >= toDateTime64",
+      );
+      expect(sql.match(/dt >= toDateTime64/g)).toHaveLength(2);
+      expect(sql.match(/dt <= toDateTime64/g)).toHaveLength(2);
+    });
+
+    it("should apply field extraction, filters, ordering, and limit outside the storage union", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        fields: ["dt", "message"],
+        search: "timeout",
+        limit: 25,
+      });
+
+      expect(sql).toContain(
+        "SELECT dt, JSON_VALUE(raw, '$.message') AS \"message\" FROM (SELECT dt, raw FROM remote",
+      );
+      expect(sql).toContain(
+        ") WHERE raw LIKE '%timeout%' ORDER BY dt DESC LIMIT 25 FORMAT JSONEachRow",
+      );
+    });
+
+    it("should support hot-only queries without the archived storage branch", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        since: "2024-01-01T00:00:00Z",
+      });
+
+      expect(sql).toContain("SELECT dt, raw FROM remote(t123456_test_source_logs) WHERE dt >=");
+      expect(sql).not.toContain("s3Cluster");
+      expect(sql).not.toContain("UNION ALL");
     });
 
     it("should build query with where clause", async () => {
@@ -429,7 +476,7 @@ describe("Query Builder Integration", () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          "Executing query: SELECT dt, raw FROM remote(t123456_test_source_logs)",
+          "Executing query: SELECT dt, raw FROM (SELECT dt, raw FROM remote(t123456_test_source_logs)",
         ),
       );
 

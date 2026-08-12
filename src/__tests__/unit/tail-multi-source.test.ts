@@ -13,6 +13,7 @@ describe("tailLogs multi-source correlation", () => {
   const originalLog = console.log;
   const originalError = console.error;
   const originalExecute = QueryAPI.prototype.execute;
+  const originalSetInterval = globalThis.setInterval;
   let logSpy: ReturnType<typeof mock>;
   let errorSpy: ReturnType<typeof mock>;
 
@@ -37,6 +38,7 @@ describe("tailLogs multi-source correlation", () => {
     console.log = originalLog;
     console.error = originalError;
     QueryAPI.prototype.execute = originalExecute;
+    globalThis.setInterval = originalSetInterval;
   });
 
   it("merges multiple sources and annotates each entry with its origin", async () => {
@@ -77,5 +79,20 @@ describe("tailLogs multi-source correlation", () => {
     expect(typedPayload.map((entry) => entry.source)).toEqual(["source-b", "source-a", "source-b"]);
     expect(typedPayload[0].dt).toBe("2025-09-24 12:00:07.000000");
     expect(errorSpy.mock.calls.length).toBe(0);
+  });
+
+  it("uses hot storage for initial reads and polling across sources in follow mode", async () => {
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+    executeMock.mockResolvedValue([]);
+
+    await tailLogs({ sources: ["source-a", "source-b"], follow: true, format: "json", limit: 1 });
+    await poll?.();
+
+    expect(executeMock.mock.calls.length).toBe(4);
+    expect(executeMock.mock.calls.every(([options]) => options.hotOnly === true)).toBe(true);
   });
 });

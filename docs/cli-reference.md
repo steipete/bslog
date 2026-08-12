@@ -31,11 +31,14 @@ This page collects bslog's command and option reference. Run `bslog <command> --
 | `--format <type>`      | `pretty`, `json`, `table`, or `csv`                       |
 | `--fields <names>`     | Comma-separated selected fields                           |
 | `--sources <names>`    | Comma-separated sources to merge                          |
+| `--hot-only`           | Query hot storage only; excludes archived logs            |
 | `--where <filter...>`  | One or more `field=value` JSON filters                    |
 | `--jq <filter>`        | Run JSON output through `jq` if it is available in `PATH` |
 | `-v, --verbose`        | Print generated SQL and debugging details                 |
 
-`tail` additionally accepts `--level`, `--subsystem`, `--follow`, and `--interval`. `search` also accepts `--level`.
+Normal log commands query both Better Stack hot and archived storage, so they include archived matches. `--limit` still caps the rows returned. Use `--hot-only` for low-latency reads where archived results are not needed. `tail --follow` is always hot-only because it polls for new entries.
+
+`tail` additionally accepts `--level`, `--subsystem`, `--follow`, and `--interval`. `search` also accepts `--level`. The GraphQL-inspired `query` command also accepts `--hot-only`.
 
 Values passed through `--where` recognize booleans, numbers, `null`, quoted strings, and JSON object or array values. Repeat the option to combine equality predicates:
 

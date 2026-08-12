@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.5.3] - Unreleased
 
-No unreleased changes.
+- Query normal log commands across Better Stack hot and archived storage, while keeping follow polling hot-only. Add `--hot-only` for low-latency reads that intentionally exclude archived logs.
 
 ## [1.5.2] - 2026-08-02
 

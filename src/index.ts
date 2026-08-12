@@ -52,6 +52,7 @@ program
   .argument("<query>", "GraphQL-like query string")
   .option("-s, --source <name>", "Source name")
   .option("-f, --format <type>", "Output format (json|table|csv|pretty)", "pretty")
+  .option("--hot-only", "Query hot storage only (faster, excludes archived logs)")
   .option("-v, --verbose", "Show SQL query and debug information")
   .description("Query logs using GraphQL-like syntax")
   .action(async (query, options) => {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { Command } from "commander";
+import { registerLogCommand } from "../../utils/command-factory";
 import {
   normalizeSourcesOption,
   parseLimitOption,
@@ -85,5 +87,23 @@ describe("CLI option helpers", () => {
       expect(result.where).toEqual({ module: "timeline" });
       expect(result.jq).toBe(".[]");
     });
+  });
+
+  it("passes --hot-only through shared log command options", async () => {
+    const program = new Command();
+    let receivedOptions: Record<string, unknown> | undefined;
+
+    registerLogCommand(program, {
+      name: "logs",
+      description: "Test command",
+      handler: ({ options }) => {
+        receivedOptions = options;
+        return Promise.resolve();
+      },
+    });
+
+    await program.parseAsync(["node", "test", "logs", "--hot-only"]);
+
+    expect(receivedOptions?.hotOnly).toBe(true);
   });
 });

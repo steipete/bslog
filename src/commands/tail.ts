@@ -45,6 +45,10 @@ export async function tailLogs(options: TailOptions): Promise<void> {
     ...(remainingOptions as QueryOptions),
   };
 
+  if (follow) {
+    queryOptions.hotOnly = true;
+  }
+
   const normalizedFields = normalizeFieldsOption(rawFields);
   if (normalizedFields) {
     queryOptions.fields = normalizedFields;
