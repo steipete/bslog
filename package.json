@@ -1,6 +1,6 @@
 {
   "name": "@steipete/bslog",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Better Stack log query CLI with GraphQL-inspired syntax",
   "keywords": [
     "betterstack",
