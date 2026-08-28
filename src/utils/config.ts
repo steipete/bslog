@@ -3,8 +3,13 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../types";
 
-const CONFIG_DIR = join(homedir(), ".bslog");
-const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+export function getConfigDir(): string {
+  return process.env.BSLOG_CONFIG_DIR || join(homedir(), ".bslog");
+}
+
+export function getConfigFile(): string {
+  return join(getConfigDir(), "config.json");
+}
 
 export const DEFAULT_QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
 
@@ -28,7 +33,8 @@ export function getQueryCredentials(): { username?: string; password?: string } 
 }
 
 export function loadConfig(): Config {
-  if (!existsSync(CONFIG_FILE)) {
+  const configFile = getConfigFile();
+  if (!existsSync(configFile)) {
     return {
       defaultLimit: 100,
       outputFormat: "json",
@@ -39,7 +45,7 @@ export function loadConfig(): Config {
   }
 
   try {
-    const content = readFileSync(CONFIG_FILE, "utf-8");
+    const content = readFileSync(configFile, "utf-8");
     const parsed = JSON.parse(content) as Config;
 
     if (!parsed.defaultLogLevel) {
@@ -58,11 +64,12 @@ export function loadConfig(): Config {
 }
 
 export function saveConfig(config: Config): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+  const configDir = getConfigDir();
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true });
   }
 
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
 }
 
 export function updateConfig(updates: Partial<Config>): void {

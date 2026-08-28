@@ -179,26 +179,26 @@ export class QueryAPI {
     }
 
     // Build the SQL query using team_id and table_name from the source
-    const tableName = `t${source.attributes.team_id}_${source.attributes.table_name}_logs`;
+    const tablePrefix = `t${source.attributes.team_id}_${source.attributes.table_name}`;
     const fields =
       options.fields && options.fields.length > 0
         ? this.buildFieldSelection(options.fields)
         : "dt, raw";
 
-    let sql = `SELECT ${fields} FROM remote(${tableName})`;
-
-    // Build WHERE clause
-    const conditions: string[] = [];
+    const timeConditions: string[] = [];
 
     if (options.since) {
       const sinceDate = parseTimeString(options.since);
-      conditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
+      timeConditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
     }
 
     if (options.until) {
       const untilDate = parseTimeString(options.until);
-      conditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
+      timeConditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
     }
+
+    // Keep non-time filters outside the storage union so both tiers expose the same rows.
+    const conditions: string[] = [];
 
     if (effectiveLevel) {
       const escapedLevel = effectiveLevel.replace(/'/g, "''").toLowerCase();
@@ -252,8 +252,22 @@ export class QueryAPI {
       }
     }
 
-    if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(" AND ")}`;
+    let sql: string;
+    if (options.hotOnly) {
+      sql = `SELECT ${fields} FROM remote(${tablePrefix}_logs)`;
+      const allConditions = [...timeConditions, ...conditions];
+      if (allConditions.length > 0) {
+        sql += ` WHERE ${allConditions.join(" AND ")}`;
+      }
+    } else {
+      const timeWhere = timeConditions.length > 0 ? ` WHERE ${timeConditions.join(" AND ")}` : "";
+      const coldTimeWhere = timeConditions.length > 0 ? ` AND ${timeConditions.join(" AND ")}` : "";
+
+      sql = `SELECT ${fields} FROM (SELECT dt, raw FROM remote(${tablePrefix}_logs)${timeWhere} UNION ALL SELECT dt, raw FROM s3Cluster(primary, ${tablePrefix}_s3) WHERE _row_type = 1${coldTimeWhere})`;
+
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(" AND ")}`;
+      }
     }
 
     // Add ORDER BY and LIMIT

@@ -21,12 +21,14 @@ var __toESM = (mod, isNodeMode, target) => {
   }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
-  for (let key of __getOwnPropNames(mod))
-    if (!__hasOwnProp.call(to, key))
-      __defProp(to, key, {
-        get: __accessProp.bind(mod, key),
-        enumerable: true
-      });
+  if (mod && typeof mod === "object" || typeof mod === "function") {
+    for (let key of __getOwnPropNames(mod))
+      if (!__hasOwnProp.call(to, key))
+        __defProp(to, key, {
+          get: __accessProp.bind(mod, key),
+          enumerable: true
+        });
+  }
   if (canCache)
     cache.set(mod, to);
   return to;
@@ -35,7 +37,7 @@ var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, 
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 
 // node_modules/cli-table3/src/debug.js
-var require_debug = __commonJS((exports, module) => {
+var require_debug = __commonJS(function(exports, module) {
   var messages = [];
   var level = 0;
   var debug = (msg, min) => {
@@ -60,7 +62,7 @@ var require_debug = __commonJS((exports, module) => {
 });
 
 // node_modules/ansi-regex/index.js
-var require_ansi_regex = __commonJS((exports, module) => {
+var require_ansi_regex = __commonJS(function(exports, module) {
   module.exports = ({ onlyFirst = false } = {}) => {
     const pattern = [
       "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
@@ -71,13 +73,13 @@ var require_ansi_regex = __commonJS((exports, module) => {
 });
 
 // node_modules/strip-ansi/index.js
-var require_strip_ansi = __commonJS((exports, module) => {
+var require_strip_ansi = __commonJS(function(exports, module) {
   var ansiRegex = require_ansi_regex();
   module.exports = (string) => typeof string === "string" ? string.replace(ansiRegex(), "") : string;
 });
 
 // node_modules/is-fullwidth-code-point/index.js
-var require_is_fullwidth_code_point = __commonJS((exports, module) => {
+var require_is_fullwidth_code_point = __commonJS(function(exports, module) {
   var isFullwidthCodePoint = (codePoint) => {
     if (Number.isNaN(codePoint)) {
       return false;
@@ -92,14 +94,14 @@ var require_is_fullwidth_code_point = __commonJS((exports, module) => {
 });
 
 // node_modules/emoji-regex/index.js
-var require_emoji_regex = __commonJS((exports, module) => {
+var require_emoji_regex = __commonJS(function(exports, module) {
   module.exports = function() {
     return /\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62(?:\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67|\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74|\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73)\uDB40\uDC7F|\uD83D\uDC68(?:\uD83C\uDFFC\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68\uD83C\uDFFB|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFF\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB-\uDFFE])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFE\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB-\uDFFD])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFD\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB\uDFFC])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\u200D(?:\u2764\uFE0F\u200D(?:\uD83D\uDC8B\u200D)?\uD83D\uDC68|(?:\uD83D[\uDC68\uDC69])\u200D(?:\uD83D\uDC66\u200D\uD83D\uDC66|\uD83D\uDC67\u200D(?:\uD83D[\uDC66\uDC67]))|\uD83D\uDC66\u200D\uD83D\uDC66|\uD83D\uDC67\u200D(?:\uD83D[\uDC66\uDC67])|(?:\uD83D[\uDC68\uDC69])\u200D(?:\uD83D[\uDC66\uDC67])|[\u2695\u2696\u2708]\uFE0F|\uD83D[\uDC66\uDC67]|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|(?:\uD83C\uDFFB\u200D[\u2695\u2696\u2708]|\uD83C\uDFFF\u200D[\u2695\u2696\u2708]|\uD83C\uDFFE\u200D[\u2695\u2696\u2708]|\uD83C\uDFFD\u200D[\u2695\u2696\u2708]|\uD83C\uDFFC\u200D[\u2695\u2696\u2708])\uFE0F|\uD83C\uDFFB\u200D(?:\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C[\uDFFB-\uDFFF])|(?:\uD83E\uDDD1\uD83C\uDFFB\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1|\uD83D\uDC69\uD83C\uDFFC\u200D\uD83E\uDD1D\u200D\uD83D\uDC69)\uD83C\uDFFB|\uD83E\uDDD1(?:\uD83C\uDFFF\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1(?:\uD83C[\uDFFB-\uDFFF])|\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1)|(?:\uD83E\uDDD1\uD83C\uDFFE\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1|\uD83D\uDC69\uD83C\uDFFF\u200D\uD83E\uDD1D\u200D(?:\uD83D[\uDC68\uDC69]))(?:\uD83C[\uDFFB-\uDFFE])|(?:\uD83E\uDDD1\uD83C\uDFFC\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1|\uD83D\uDC69\uD83C\uDFFD\u200D\uD83E\uDD1D\u200D\uD83D\uDC69)(?:\uD83C[\uDFFB\uDFFC])|\uD83D\uDC69(?:\uD83C\uDFFE\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB-\uDFFD\uDFFF])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFC\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB\uDFFD-\uDFFF])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFB\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFC-\uDFFF])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFD\u200D(?:\uD83E\uDD1D\u200D\uD83D\uDC68(?:\uD83C[\uDFFB\uDFFC\uDFFE\uDFFF])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\u200D(?:\u2764\uFE0F\u200D(?:\uD83D\uDC8B\u200D(?:\uD83D[\uDC68\uDC69])|\uD83D[\uDC68\uDC69])|\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD])|\uD83C\uDFFF\u200D(?:\uD83C[\uDF3E\uDF73\uDF93\uDFA4\uDFA8\uDFEB\uDFED]|\uD83D[\uDCBB\uDCBC\uDD27\uDD2C\uDE80\uDE92]|\uD83E[\uDDAF-\uDDB3\uDDBC\uDDBD]))|\uD83D\uDC69\u200D\uD83D\uDC69\u200D(?:\uD83D\uDC66\u200D\uD83D\uDC66|\uD83D\uDC67\u200D(?:\uD83D[\uDC66\uDC67]))|(?:\uD83E\uDDD1\uD83C\uDFFD\u200D\uD83E\uDD1D\u200D\uD83E\uDDD1|\uD83D\uDC69\uD83C\uDFFE\u200D\uD83E\uDD1D\u200D\uD83D\uDC69)(?:\uD83C[\uDFFB-\uDFFD])|\uD83D\uDC69\u200D\uD83D\uDC66\u200D\uD83D\uDC66|\uD83D\uDC69\u200D\uD83D\uDC69\u200D(?:\uD83D[\uDC66\uDC67])|(?:\uD83D\uDC41\uFE0F\u200D\uD83D\uDDE8|\uD83D\uDC69(?:\uD83C\uDFFF\u200D[\u2695\u2696\u2708]|\uD83C\uDFFE\u200D[\u2695\u2696\u2708]|\uD83C\uDFFC\u200D[\u2695\u2696\u2708]|\uD83C\uDFFB\u200D[\u2695\u2696\u2708]|\uD83C\uDFFD\u200D[\u2695\u2696\u2708]|\u200D[\u2695\u2696\u2708])|(?:(?:\u26F9|\uD83C[\uDFCB\uDFCC]|\uD83D\uDD75)\uFE0F|\uD83D\uDC6F|\uD83E[\uDD3C\uDDDE\uDDDF])\u200D[\u2640\u2642]|(?:\u26F9|\uD83C[\uDFCB\uDFCC]|\uD83D\uDD75)(?:\uD83C[\uDFFB-\uDFFF])\u200D[\u2640\u2642]|(?:\uD83C[\uDFC3\uDFC4\uDFCA]|\uD83D[\uDC6E\uDC71\uDC73\uDC77\uDC81\uDC82\uDC86\uDC87\uDE45-\uDE47\uDE4B\uDE4D\uDE4E\uDEA3\uDEB4-\uDEB6]|\uD83E[\uDD26\uDD37-\uDD39\uDD3D\uDD3E\uDDB8\uDDB9\uDDCD-\uDDCF\uDDD6-\uDDDD])(?:(?:\uD83C[\uDFFB-\uDFFF])\u200D[\u2640\u2642]|\u200D[\u2640\u2642])|\uD83C\uDFF4\u200D\u2620)\uFE0F|\uD83D\uDC69\u200D\uD83D\uDC67\u200D(?:\uD83D[\uDC66\uDC67])|\uD83C\uDFF3\uFE0F\u200D\uD83C\uDF08|\uD83D\uDC15\u200D\uD83E\uDDBA|\uD83D\uDC69\u200D\uD83D\uDC66|\uD83D\uDC69\u200D\uD83D\uDC67|\uD83C\uDDFD\uD83C\uDDF0|\uD83C\uDDF4\uD83C\uDDF2|\uD83C\uDDF6\uD83C\uDDE6|[#\*0-9]\uFE0F\u20E3|\uD83C\uDDE7(?:\uD83C[\uDDE6\uDDE7\uDDE9-\uDDEF\uDDF1-\uDDF4\uDDF6-\uDDF9\uDDFB\uDDFC\uDDFE\uDDFF])|\uD83C\uDDF9(?:\uD83C[\uDDE6\uDDE8\uDDE9\uDDEB-\uDDED\uDDEF-\uDDF4\uDDF7\uDDF9\uDDFB\uDDFC\uDDFF])|\uD83C\uDDEA(?:\uD83C[\uDDE6\uDDE8\uDDEA\uDDEC\uDDED\uDDF7-\uDDFA])|\uD83E\uDDD1(?:\uD83C[\uDFFB-\uDFFF])|\uD83C\uDDF7(?:\uD83C[\uDDEA\uDDF4\uDDF8\uDDFA\uDDFC])|\uD83D\uDC69(?:\uD83C[\uDFFB-\uDFFF])|\uD83C\uDDF2(?:\uD83C[\uDDE6\uDDE8-\uDDED\uDDF0-\uDDFF])|\uD83C\uDDE6(?:\uD83C[\uDDE8-\uDDEC\uDDEE\uDDF1\uDDF2\uDDF4\uDDF6-\uDDFA\uDDFC\uDDFD\uDDFF])|\uD83C\uDDF0(?:\uD83C[\uDDEA\uDDEC-\uDDEE\uDDF2\uDDF3\uDDF5\uDDF7\uDDFC\uDDFE\uDDFF])|\uD83C\uDDED(?:\uD83C[\uDDF0\uDDF2\uDDF3\uDDF7\uDDF9\uDDFA])|\uD83C\uDDE9(?:\uD83C[\uDDEA\uDDEC\uDDEF\uDDF0\uDDF2\uDDF4\uDDFF])|\uD83C\uDDFE(?:\uD83C[\uDDEA\uDDF9])|\uD83C\uDDEC(?:\uD83C[\uDDE6\uDDE7\uDDE9-\uDDEE\uDDF1-\uDDF3\uDDF5-\uDDFA\uDDFC\uDDFE])|\uD83C\uDDF8(?:\uD83C[\uDDE6-\uDDEA\uDDEC-\uDDF4\uDDF7-\uDDF9\uDDFB\uDDFD-\uDDFF])|\uD83C\uDDEB(?:\uD83C[\uDDEE-\uDDF0\uDDF2\uDDF4\uDDF7])|\uD83C\uDDF5(?:\uD83C[\uDDE6\uDDEA-\uDDED\uDDF0-\uDDF3\uDDF7-\uDDF9\uDDFC\uDDFE])|\uD83C\uDDFB(?:\uD83C[\uDDE6\uDDE8\uDDEA\uDDEC\uDDEE\uDDF3\uDDFA])|\uD83C\uDDF3(?:\uD83C[\uDDE6\uDDE8\uDDEA-\uDDEC\uDDEE\uDDF1\uDDF4\uDDF5\uDDF7\uDDFA\uDDFF])|\uD83C\uDDE8(?:\uD83C[\uDDE6\uDDE8\uDDE9\uDDEB-\uDDEE\uDDF0-\uDDF5\uDDF7\uDDFA-\uDDFF])|\uD83C\uDDF1(?:\uD83C[\uDDE6-\uDDE8\uDDEE\uDDF0\uDDF7-\uDDFB\uDDFE])|\uD83C\uDDFF(?:\uD83C[\uDDE6\uDDF2\uDDFC])|\uD83C\uDDFC(?:\uD83C[\uDDEB\uDDF8])|\uD83C\uDDFA(?:\uD83C[\uDDE6\uDDEC\uDDF2\uDDF3\uDDF8\uDDFE\uDDFF])|\uD83C\uDDEE(?:\uD83C[\uDDE8-\uDDEA\uDDF1-\uDDF4\uDDF6-\uDDF9])|\uD83C\uDDEF(?:\uD83C[\uDDEA\uDDF2\uDDF4\uDDF5])|(?:\uD83C[\uDFC3\uDFC4\uDFCA]|\uD83D[\uDC6E\uDC71\uDC73\uDC77\uDC81\uDC82\uDC86\uDC87\uDE45-\uDE47\uDE4B\uDE4D\uDE4E\uDEA3\uDEB4-\uDEB6]|\uD83E[\uDD26\uDD37-\uDD39\uDD3D\uDD3E\uDDB8\uDDB9\uDDCD-\uDDCF\uDDD6-\uDDDD])(?:\uD83C[\uDFFB-\uDFFF])|(?:\u26F9|\uD83C[\uDFCB\uDFCC]|\uD83D\uDD75)(?:\uD83C[\uDFFB-\uDFFF])|(?:[\u261D\u270A-\u270D]|\uD83C[\uDF85\uDFC2\uDFC7]|\uD83D[\uDC42\uDC43\uDC46-\uDC50\uDC66\uDC67\uDC6B-\uDC6D\uDC70\uDC72\uDC74-\uDC76\uDC78\uDC7C\uDC83\uDC85\uDCAA\uDD74\uDD7A\uDD90\uDD95\uDD96\uDE4C\uDE4F\uDEC0\uDECC]|\uD83E[\uDD0F\uDD18-\uDD1C\uDD1E\uDD1F\uDD30-\uDD36\uDDB5\uDDB6\uDDBB\uDDD2-\uDDD5])(?:\uD83C[\uDFFB-\uDFFF])|(?:[\u231A\u231B\u23E9-\u23EC\u23F0\u23F3\u25FD\u25FE\u2614\u2615\u2648-\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55]|\uD83C[\uDC04\uDCCF\uDD8E\uDD91-\uDD9A\uDDE6-\uDDFF\uDE01\uDE1A\uDE2F\uDE32-\uDE36\uDE38-\uDE3A\uDE50\uDE51\uDF00-\uDF20\uDF2D-\uDF35\uDF37-\uDF7C\uDF7E-\uDF93\uDFA0-\uDFCA\uDFCF-\uDFD3\uDFE0-\uDFF0\uDFF4\uDFF8-\uDFFF]|\uD83D[\uDC00-\uDC3E\uDC40\uDC42-\uDCFC\uDCFF-\uDD3D\uDD4B-\uDD4E\uDD50-\uDD67\uDD7A\uDD95\uDD96\uDDA4\uDDFB-\uDE4F\uDE80-\uDEC5\uDECC\uDED0-\uDED2\uDED5\uDEEB\uDEEC\uDEF4-\uDEFA\uDFE0-\uDFEB]|\uD83E[\uDD0D-\uDD3A\uDD3C-\uDD45\uDD47-\uDD71\uDD73-\uDD76\uDD7A-\uDDA2\uDDA5-\uDDAA\uDDAE-\uDDCA\uDDCD-\uDDFF\uDE70-\uDE73\uDE78-\uDE7A\uDE80-\uDE82\uDE90-\uDE95])|(?:[#\*0-9\xA9\xAE\u203C\u2049\u2122\u2139\u2194-\u2199\u21A9\u21AA\u231A\u231B\u2328\u23CF\u23E9-\u23F3\u23F8-\u23FA\u24C2\u25AA\u25AB\u25B6\u25C0\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614\u2615\u2618\u261D\u2620\u2622\u2623\u2626\u262A\u262E\u262F\u2638-\u263A\u2640\u2642\u2648-\u2653\u265F\u2660\u2663\u2665\u2666\u2668\u267B\u267E\u267F\u2692-\u2697\u2699\u269B\u269C\u26A0\u26A1\u26AA\u26AB\u26B0\u26B1\u26BD\u26BE\u26C4\u26C5\u26C8\u26CE\u26CF\u26D1\u26D3\u26D4\u26E9\u26EA\u26F0-\u26F5\u26F7-\u26FA\u26FD\u2702\u2705\u2708-\u270D\u270F\u2712\u2714\u2716\u271D\u2721\u2728\u2733\u2734\u2744\u2747\u274C\u274E\u2753-\u2755\u2757\u2763\u2764\u2795-\u2797\u27A1\u27B0\u27BF\u2934\u2935\u2B05-\u2B07\u2B1B\u2B1C\u2B50\u2B55\u3030\u303D\u3297\u3299]|\uD83C[\uDC04\uDCCF\uDD70\uDD71\uDD7E\uDD7F\uDD8E\uDD91-\uDD9A\uDDE6-\uDDFF\uDE01\uDE02\uDE1A\uDE2F\uDE32-\uDE3A\uDE50\uDE51\uDF00-\uDF21\uDF24-\uDF93\uDF96\uDF97\uDF99-\uDF9B\uDF9E-\uDFF0\uDFF3-\uDFF5\uDFF7-\uDFFF]|\uD83D[\uDC00-\uDCFD\uDCFF-\uDD3D\uDD49-\uDD4E\uDD50-\uDD67\uDD6F\uDD70\uDD73-\uDD7A\uDD87\uDD8A-\uDD8D\uDD90\uDD95\uDD96\uDDA4\uDDA5\uDDA8\uDDB1\uDDB2\uDDBC\uDDC2-\uDDC4\uDDD1-\uDDD3\uDDDC-\uDDDE\uDDE1\uDDE3\uDDE8\uDDEF\uDDF3\uDDFA-\uDE4F\uDE80-\uDEC5\uDECB-\uDED2\uDED5\uDEE0-\uDEE5\uDEE9\uDEEB\uDEEC\uDEF0\uDEF3-\uDEFA\uDFE0-\uDFEB]|\uD83E[\uDD0D-\uDD3A\uDD3C-\uDD45\uDD47-\uDD71\uDD73-\uDD76\uDD7A-\uDDA2\uDDA5-\uDDAA\uDDAE-\uDDCA\uDDCD-\uDDFF\uDE70-\uDE73\uDE78-\uDE7A\uDE80-\uDE82\uDE90-\uDE95])\uFE0F|(?:[\u261D\u26F9\u270A-\u270D]|\uD83C[\uDF85\uDFC2-\uDFC4\uDFC7\uDFCA-\uDFCC]|\uD83D[\uDC42\uDC43\uDC46-\uDC50\uDC66-\uDC78\uDC7C\uDC81-\uDC83\uDC85-\uDC87\uDC8F\uDC91\uDCAA\uDD74\uDD75\uDD7A\uDD90\uDD95\uDD96\uDE45-\uDE47\uDE4B-\uDE4F\uDEA3\uDEB4-\uDEB6\uDEC0\uDECC]|\uD83E[\uDD0F\uDD18-\uDD1F\uDD26\uDD30-\uDD39\uDD3C-\uDD3E\uDDB5\uDDB6\uDDB8\uDDB9\uDDBB\uDDCD-\uDDCF\uDDD1-\uDDDD])/g;
   };
 });
 
 // node_modules/string-width/index.js
-var require_string_width = __commonJS((exports, module) => {
+var require_string_width = __commonJS(function(exports, module) {
   var stripAnsi = require_strip_ansi();
   var isFullwidthCodePoint = require_is_fullwidth_code_point();
   var emojiRegex = require_emoji_regex();
@@ -133,7 +135,7 @@ var require_string_width = __commonJS((exports, module) => {
 });
 
 // node_modules/cli-table3/src/utils.js
-var require_utils = __commonJS((exports, module) => {
+var require_utils = __commonJS(function(exports, module) {
   var stringWidth = require_string_width();
   function codeRegex(capture) {
     return capture ? /\u001b\[((?:\d*;){0,5}\d*)m/g : /\u001b\[(?:\d*;){0,5}\d*m/g;
@@ -437,7 +439,7 @@ var require_utils = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/styles.js
-var require_styles = __commonJS((exports, module) => {
+var require_styles = __commonJS(function(exports, module) {
   var styles4 = {};
   module["exports"] = styles4;
   var codes = {
@@ -501,7 +503,7 @@ var require_styles = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/system/has-flag.js
-var require_has_flag = __commonJS((exports, module) => {
+var require_has_flag = __commonJS(function(exports, module) {
   module.exports = function(flag, argv) {
     argv = argv || process.argv;
     var terminatorPos = argv.indexOf("--");
@@ -512,7 +514,7 @@ var require_has_flag = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/system/supports-colors.js
-var require_supports_colors = __commonJS((exports, module) => {
+var require_supports_colors = __commonJS(function(exports, module) {
   var os2 = __require("os");
   var hasFlag2 = require_has_flag();
   var env2 = process.env;
@@ -605,7 +607,7 @@ var require_supports_colors = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/custom/trap.js
-var require_trap = __commonJS((exports, module) => {
+var require_trap = __commonJS(function(exports, module) {
   module["exports"] = function runTheTrap(text, options) {
     var result = "";
     text = text || "Run the trap, drop the bass";
@@ -672,7 +674,7 @@ var require_trap = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/custom/zalgo.js
-var require_zalgo = __commonJS((exports, module) => {
+var require_zalgo = __commonJS(function(exports, module) {
   module["exports"] = function zalgo(text, options) {
     text = text || "   he is here   ";
     var soul = {
@@ -857,7 +859,7 @@ var require_zalgo = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/maps/america.js
-var require_america = __commonJS((exports, module) => {
+var require_america = __commonJS(function(exports, module) {
   module["exports"] = function(colors) {
     return function(letter, i, exploded) {
       if (letter === " ")
@@ -875,7 +877,7 @@ var require_america = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/maps/zebra.js
-var require_zebra = __commonJS((exports, module) => {
+var require_zebra = __commonJS(function(exports, module) {
   module["exports"] = function(colors) {
     return function(letter, i, exploded) {
       return i % 2 === 0 ? letter : colors.inverse(letter);
@@ -884,7 +886,7 @@ var require_zebra = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/maps/rainbow.js
-var require_rainbow = __commonJS((exports, module) => {
+var require_rainbow = __commonJS(function(exports, module) {
   module["exports"] = function(colors) {
     var rainbowColors = ["red", "yellow", "green", "blue", "magenta"];
     return function(letter, i, exploded) {
@@ -898,7 +900,7 @@ var require_rainbow = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/maps/random.js
-var require_random = __commonJS((exports, module) => {
+var require_random = __commonJS(function(exports, module) {
   module["exports"] = function(colors) {
     var available = [
       "underline",
@@ -926,7 +928,7 @@ var require_random = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/lib/colors.js
-var require_colors = __commonJS((exports, module) => {
+var require_colors = __commonJS(function(exports, module) {
   var colors = {};
   module["exports"] = colors;
   colors.themes = {};
@@ -1068,13 +1070,13 @@ var require_colors = __commonJS((exports, module) => {
 });
 
 // node_modules/@colors/colors/safe.js
-var require_safe = __commonJS((exports, module) => {
+var require_safe = __commonJS(function(exports, module) {
   var colors = require_colors();
   module["exports"] = colors;
 });
 
 // node_modules/cli-table3/src/cell.js
-var require_cell = __commonJS((exports, module) => {
+var require_cell = __commonJS(function(exports, module) {
   var { info, debug } = require_debug();
   var utils = require_utils();
 
@@ -1386,7 +1388,7 @@ var require_cell = __commonJS((exports, module) => {
 });
 
 // node_modules/cli-table3/src/layout-manager.js
-var require_layout_manager = __commonJS((exports, module) => {
+var require_layout_manager = __commonJS(function(exports, module) {
   var { warn, debug } = require_debug();
   var Cell = require_cell();
   var { ColSpanCell, RowSpanCell } = Cell;
@@ -1622,7 +1624,7 @@ var require_layout_manager = __commonJS((exports, module) => {
 });
 
 // node_modules/cli-table3/src/table.js
-var require_table = __commonJS((exports, module) => {
+var require_table = __commonJS(function(exports, module) {
   var debug = require_debug();
   var utils = require_utils();
   var tableLayout = require_layout_manager();
@@ -1717,11 +1719,46 @@ var require_table = __commonJS((exports, module) => {
   module.exports = Table;
 });
 
+// node_modules/chalk/source/utilities.js
+function stringReplaceAll(string, substring, postfix) {
+  let index = string.indexOf(substring);
+  if (index === -1) {
+    return string;
+  }
+  const substringLength = substring.length;
+  let endIndex = 0;
+  let returnValue = "";
+  do {
+    returnValue += string.slice(endIndex, index) + substring + postfix;
+    endIndex = index + substringLength;
+    index = string.indexOf(substring, endIndex);
+  } while (index !== -1);
+  returnValue += string.slice(endIndex);
+  return returnValue;
+}
+function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
+  let endIndex = 0;
+  let returnValue = "";
+  do {
+    const isGotCR = string[index - 1] === "\r";
+    returnValue += string.slice(endIndex, isGotCR ? index - 1 : index) + prefix + (isGotCR ? `\r
+` : `
+`) + postfix;
+    endIndex = index + 1;
+    index = string.indexOf(`
+`, endIndex);
+  } while (index !== -1);
+  returnValue += string.slice(endIndex);
+  return returnValue;
+}
+
 // node_modules/chalk/source/vendor/ansi-styles/index.js
 var ANSI_BACKGROUND_OFFSET = 10;
+var ANSI_UNDERLINE_OFFSET = 20;
 var wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`;
 var wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`;
 var wrapAnsi16m = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`;
+var wrapUnderlineAnsi = (code) => `\x1B[58;5;${code < 90 ? code - 30 : code - 90 + 8}m`;
 var styles = {
   modifier: {
     reset: [0, 0],
@@ -1729,6 +1766,10 @@ var styles = {
     dim: [2, 22],
     italic: [3, 23],
     underline: [4, 24],
+    underlineDouble: ["4:2", 24],
+    underlineCurly: ["4:3", 24],
+    underlineDotted: ["4:4", 24],
+    underlineDashed: ["4:5", 24],
     overline: [53, 55],
     inverse: [7, 27],
     hidden: [8, 28],
@@ -1773,11 +1814,32 @@ var styles = {
     bgMagentaBright: [105, 49],
     bgCyanBright: [106, 49],
     bgWhiteBright: [107, 49]
+  },
+  underlineColor: {
+    underlineBlack: ["58;5;0", 59],
+    underlineRed: ["58;5;1", 59],
+    underlineGreen: ["58;5;2", 59],
+    underlineYellow: ["58;5;3", 59],
+    underlineBlue: ["58;5;4", 59],
+    underlineMagenta: ["58;5;5", 59],
+    underlineCyan: ["58;5;6", 59],
+    underlineWhite: ["58;5;7", 59],
+    underlineBlackBright: ["58;5;8", 59],
+    underlineGray: ["58;5;8", 59],
+    underlineGrey: ["58;5;8", 59],
+    underlineRedBright: ["58;5;9", 59],
+    underlineGreenBright: ["58;5;10", 59],
+    underlineYellowBright: ["58;5;11", 59],
+    underlineBlueBright: ["58;5;12", 59],
+    underlineMagentaBright: ["58;5;13", 59],
+    underlineCyanBright: ["58;5;14", 59],
+    underlineWhiteBright: ["58;5;15", 59]
   }
 };
 var modifierNames = Object.keys(styles.modifier);
 var foregroundColorNames = Object.keys(styles.color);
 var backgroundColorNames = Object.keys(styles.bgColor);
+var underlineColorNames = Object.keys(styles.underlineColor);
 var colorNames = [...foregroundColorNames, ...backgroundColorNames];
 function assembleStyles() {
   const codes = new Map;
@@ -1788,7 +1850,7 @@ function assembleStyles() {
         close: `\x1B[${style[1]}m`
       };
       group[styleName] = styles[styleName];
-      codes.set(style[0], style[1]);
+      codes.set(Number.parseInt(style[0], 10), style[1]);
     }
     Object.defineProperty(styles, groupName, {
       value: group,
@@ -1801,12 +1863,16 @@ function assembleStyles() {
   });
   styles.color.close = "\x1B[39m";
   styles.bgColor.close = "\x1B[49m";
+  styles.underlineColor.close = "\x1B[59m";
   styles.color.ansi = wrapAnsi16();
   styles.color.ansi256 = wrapAnsi256();
   styles.color.ansi16m = wrapAnsi16m();
   styles.bgColor.ansi = wrapAnsi16(ANSI_BACKGROUND_OFFSET);
   styles.bgColor.ansi256 = wrapAnsi256(ANSI_BACKGROUND_OFFSET);
   styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
+  styles.underlineColor.ansi = wrapUnderlineAnsi;
+  styles.underlineColor.ansi256 = wrapAnsi256(ANSI_UNDERLINE_OFFSET);
+  styles.underlineColor.ansi16m = wrapAnsi16m(ANSI_UNDERLINE_OFFSET);
   Object.defineProperties(styles, {
     rgbToAnsi256: {
       value(red, green, blue) {
@@ -1825,7 +1891,7 @@ function assembleStyles() {
     },
     hexToRgb: {
       value(hex) {
-        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex.toString(16));
+        const matches = /[\da-f]{6}|[\da-f]{3}/i.exec(hex.toString(16));
         if (!matches) {
           return [0, 0, 0];
         }
@@ -1911,16 +1977,23 @@ if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || has
 } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
   flagForceColor = 1;
 }
+function hasNumericForceColor() {
+  return /^\d+$/.test(env.FORCE_COLOR);
+}
 function envForceColor() {
-  if ("FORCE_COLOR" in env) {
-    if (env.FORCE_COLOR === "true") {
-      return 1;
-    }
-    if (env.FORCE_COLOR === "false") {
-      return 0;
-    }
-    return env.FORCE_COLOR.length === 0 ? 1 : Math.min(Number.parseInt(env.FORCE_COLOR, 10), 3);
+  if (!("FORCE_COLOR" in env)) {
+    return;
   }
+  if (env.FORCE_COLOR === "false") {
+    return 0;
+  }
+  if (env.FORCE_COLOR === "true" || env.FORCE_COLOR.length === 0) {
+    return 1;
+  }
+  if (!hasNumericForceColor()) {
+    return;
+  }
+  return Math.min(Number.parseInt(env.FORCE_COLOR, 10), 3);
 }
 function translateLevel(level) {
   if (level === 0) {
@@ -1950,6 +2023,9 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
       return 2;
     }
   }
+  if (forceColor !== undefined && hasNumericForceColor()) {
+    return forceColor;
+  }
   if ("TF_BUILD" in env && "AGENT_NAME" in env) {
     return 1;
   }
@@ -1977,7 +2053,7 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
     return min;
   }
   if ("TEAMCITY_VERSION" in env) {
-    return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+    return /^(?:9\.0*[1-9]\d*\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
   }
   if (env.COLORTERM === "truecolor") {
     return 3;
@@ -1992,7 +2068,7 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
     return 3;
   }
   if ("TERM_PROGRAM" in env) {
-    const version = Number.parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+    const version = Number.parseInt((env.TERM_PROGRAM_VERSION || "").split(".", 1)[0], 10);
     switch (env.TERM_PROGRAM) {
       case "iTerm.app": {
         return version >= 3 ? 3 : 2;
@@ -2002,7 +2078,7 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
       }
     }
   }
-  if (/-256(color)?$/i.test(env.TERM)) {
+  if (/-256(?:color)?$/i.test(env.TERM)) {
     return 2;
   }
   if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
@@ -2026,57 +2102,34 @@ var supportsColor = {
 };
 var supports_color_default = supportsColor;
 
-// node_modules/chalk/source/utilities.js
-function stringReplaceAll(string, substring, replacer) {
-  let index = string.indexOf(substring);
-  if (index === -1) {
-    return string;
-  }
-  const substringLength = substring.length;
-  let endIndex = 0;
-  let returnValue = "";
-  do {
-    returnValue += string.slice(endIndex, index) + substring + replacer;
-    endIndex = index + substringLength;
-    index = string.indexOf(substring, endIndex);
-  } while (index !== -1);
-  returnValue += string.slice(endIndex);
-  return returnValue;
-}
-function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
-  let endIndex = 0;
-  let returnValue = "";
-  do {
-    const gotCR = string[index - 1] === "\r";
-    returnValue += string.slice(endIndex, gotCR ? index - 1 : index) + prefix + (gotCR ? `\r
-` : `
-`) + postfix;
-    endIndex = index + 1;
-    index = string.indexOf(`
-`, endIndex);
-  } while (index !== -1);
-  returnValue += string.slice(endIndex);
-  return returnValue;
-}
-
 // node_modules/chalk/source/index.js
 var { stdout: stdoutColor, stderr: stderrColor } = supports_color_default;
 var GENERATOR = Symbol("GENERATOR");
 var STYLER = Symbol("STYLER");
 var IS_EMPTY = Symbol("IS_EMPTY");
-var levelMapping = [
-  "ansi",
-  "ansi",
-  "ansi256",
-  "ansi16m"
-];
+var LEVEL = Symbol("LEVEL");
 var styles2 = Object.create(null);
+var assertValidLevel = (level) => {
+  if (!Number.isSafeInteger(level) || level < 0 || level > 3) {
+    throw new Error("The `level` should be an integer from 0 to 3");
+  }
+};
+var levelDescriptor = {
+  enumerable: true,
+  get() {
+    return this[LEVEL];
+  },
+  set(level) {
+    assertValidLevel(level);
+    this[LEVEL] = level;
+  }
+};
 var applyOptions = (object, options = {}) => {
-  if (options.level && !(Number.isInteger(options.level) && options.level >= 0 && options.level <= 3)) {
-    throw new Error("The `level` option should be an integer from 0 to 3");
+  if (options.level !== undefined) {
+    assertValidLevel(options.level);
   }
   const colorLevel = stdoutColor ? stdoutColor.level : 0;
-  object.level = options.level === undefined ? colorLevel : options.level;
+  object[LEVEL] = options.level === undefined ? colorLevel : options.level;
 };
 var chalkFactory = (options) => {
   const chalk = (...strings) => strings.join(" ");
@@ -2104,42 +2157,42 @@ styles2.visible = {
     return builder;
   }
 };
-var getModelAnsi = (model, level, type, ...arguments_) => {
+var createModelConverters = (model, type) => {
+  const style = ansi_styles_default[type];
   if (model === "rgb") {
-    if (level === "ansi16m") {
-      return ansi_styles_default[type].ansi16m(...arguments_);
-    }
-    if (level === "ansi256") {
-      return ansi_styles_default[type].ansi256(ansi_styles_default.rgbToAnsi256(...arguments_));
-    }
-    return ansi_styles_default[type].ansi(ansi_styles_default.rgbToAnsi(...arguments_));
+    const ansi2 = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
+    const ansi256 = (red, green, blue) => style.ansi256(ansi_styles_default.rgbToAnsi256(red, green, blue));
+    return [ansi2, ansi2, ansi256, style.ansi16m];
   }
   if (model === "hex") {
-    return getModelAnsi("rgb", level, type, ...ansi_styles_default.hexToRgb(...arguments_));
+    const ansi2 = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
+    const ansi256 = (hex) => style.ansi256(ansi_styles_default.hexToAnsi256(hex));
+    return [ansi2, ansi2, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
   }
-  return ansi_styles_default[type][model](...arguments_);
+  const ansi = (code) => style.ansi(ansi_styles_default.ansi256ToAnsi(code));
+  return [ansi, ansi, style.ansi256, style.ansi256];
 };
 var usedModels = ["rgb", "hex", "ansi256"];
 for (const model of usedModels) {
-  styles2[model] = {
-    get() {
-      const { level } = this;
-      return function(...arguments_) {
-        const styler = createStyler(getModelAnsi(model, levelMapping[level], "color", ...arguments_), ansi_styles_default.color.close, this[STYLER]);
-        return createBuilder(this, styler, this[IS_EMPTY]);
-      };
-    }
-  };
-  const bgModel = "bg" + model[0].toUpperCase() + model.slice(1);
-  styles2[bgModel] = {
-    get() {
-      const { level } = this;
-      return function(...arguments_) {
-        const styler = createStyler(getModelAnsi(model, levelMapping[level], "bgColor", ...arguments_), ansi_styles_default.bgColor.close, this[STYLER]);
-        return createBuilder(this, styler, this[IS_EMPTY]);
-      };
-    }
-  };
+  const capitalizedModel = model[0].toUpperCase() + model.slice(1);
+  for (const [styleName, type] of [
+    [model, "color"],
+    ["bg" + capitalizedModel, "bgColor"],
+    ["underline" + capitalizedModel, "underlineColor"]
+  ]) {
+    const { close } = ansi_styles_default[type];
+    const converters = createModelConverters(model, type);
+    styles2[styleName] = {
+      get() {
+        const styleFunction = function(first, second, third) {
+          const open = converters[this.level](first, second, third);
+          return createBuilder(this, createStyler(open, close, this[STYLER]), this[IS_EMPTY]);
+        };
+        Object.defineProperty(this, styleName, { value: styleFunction });
+        return styleFunction;
+      }
+    };
+  }
 }
 var proto = Object.defineProperties(() => {}, {
   ...styles2,
@@ -2172,15 +2225,23 @@ var createStyler = (open, close, parent) => {
   };
 };
 var createBuilder = (self, _styler, _isEmpty) => {
-  const builder = (...arguments_) => applyStyle(builder, arguments_.length === 1 ? "" + arguments_[0] : arguments_.join(" "));
+  const builder = (...arguments_) => {
+    if (arguments_.length === 1) {
+      return applyStyle(builder, "" + arguments_[0]);
+    }
+    if (arguments_.length === 2) {
+      return applyStyle(builder, arguments_[0] + " " + arguments_[1]);
+    }
+    return applyStyle(builder, arguments_.join(" "));
+  };
   Object.setPrototypeOf(builder, proto);
-  builder[GENERATOR] = self;
+  builder[GENERATOR] = self[GENERATOR] ?? self;
   builder[STYLER] = _styler;
   builder[IS_EMPTY] = _isEmpty;
   return builder;
 };
 var applyStyle = (self, string) => {
-  if (self.level <= 0 || !string) {
+  if (self[GENERATOR][LEVEL] <= 0 || !string) {
     return self[IS_EMPTY] ? "" : string;
   }
   let styler = self[STYLER];
@@ -2201,7 +2262,7 @@ var applyStyle = (self, string) => {
   }
   return openAll + string + closeAll;
 };
-Object.defineProperties(createChalk.prototype, styles2);
+Object.defineProperties(createChalk.prototype, { ...styles2, level: levelDescriptor });
 var chalk = createChalk();
 var chalkStderr = createChalk({ level: stderrColor ? stderrColor.level : 0 });
 var source_default = chalk;
@@ -4252,7 +4313,7 @@ var program = new Command;
 // package.json
 var package_default = {
   name: "@steipete/bslog",
-  version: "1.5.1",
+  version: "1.5.3",
   description: "Better Stack log query CLI with GraphQL-inspired syntax",
   keywords: [
     "betterstack",
@@ -4303,22 +4364,21 @@ var package_default = {
     "lint:fix": "bun run format && oxlint --fix src"
   },
   dependencies: {
-    chalk: "^5.6.2",
+    chalk: "^6.0.0",
     "cli-table3": "^0.6.5",
-    commander: "^15.0.0",
-    dotenv: "^17.4.2"
+    commander: "^15.0.0"
   },
   devDependencies: {
-    "@types/bun": "^1.3.14",
-    "@types/node": "^26.0.1",
-    oxfmt: "^0.57.0",
-    oxlint: "^1.72.0",
-    typescript: "^6.0.3"
+    "@types/bun": "^1.4.0",
+    "@types/node": "^26.4.0",
+    oxfmt: "^0.65.0",
+    oxlint: "^1.80.0",
+    typescript: "^7.0.2"
   },
   engines: {
     bun: ">=1.0.0"
   },
-  packageManager: "bun@1.3.14"
+  packageManager: "bun@1.4.0"
 };
 
 // node_modules/chalk/source/index.js
@@ -4326,19 +4386,29 @@ var { stdout: stdoutColor2, stderr: stderrColor2 } = supports_color_default;
 var GENERATOR2 = Symbol("GENERATOR");
 var STYLER2 = Symbol("STYLER");
 var IS_EMPTY2 = Symbol("IS_EMPTY");
-var levelMapping2 = [
-  "ansi",
-  "ansi",
-  "ansi256",
-  "ansi16m"
-];
+var LEVEL2 = Symbol("LEVEL");
 var styles3 = Object.create(null);
+var assertValidLevel2 = (level) => {
+  if (!Number.isSafeInteger(level) || level < 0 || level > 3) {
+    throw new Error("The `level` should be an integer from 0 to 3");
+  }
+};
+var levelDescriptor2 = {
+  enumerable: true,
+  get() {
+    return this[LEVEL2];
+  },
+  set(level) {
+    assertValidLevel2(level);
+    this[LEVEL2] = level;
+  }
+};
 var applyOptions2 = (object, options = {}) => {
-  if (options.level && !(Number.isInteger(options.level) && options.level >= 0 && options.level <= 3)) {
-    throw new Error("The `level` option should be an integer from 0 to 3");
+  if (options.level !== undefined) {
+    assertValidLevel2(options.level);
   }
   const colorLevel = stdoutColor2 ? stdoutColor2.level : 0;
-  object.level = options.level === undefined ? colorLevel : options.level;
+  object[LEVEL2] = options.level === undefined ? colorLevel : options.level;
 };
 var chalkFactory2 = (options) => {
   const chalk2 = (...strings) => strings.join(" ");
@@ -4366,42 +4436,42 @@ styles3.visible = {
     return builder;
   }
 };
-var getModelAnsi2 = (model, level, type, ...arguments_) => {
+var createModelConverters2 = (model, type) => {
+  const style = ansi_styles_default[type];
   if (model === "rgb") {
-    if (level === "ansi16m") {
-      return ansi_styles_default[type].ansi16m(...arguments_);
-    }
-    if (level === "ansi256") {
-      return ansi_styles_default[type].ansi256(ansi_styles_default.rgbToAnsi256(...arguments_));
-    }
-    return ansi_styles_default[type].ansi(ansi_styles_default.rgbToAnsi(...arguments_));
+    const ansi2 = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
+    const ansi256 = (red, green, blue) => style.ansi256(ansi_styles_default.rgbToAnsi256(red, green, blue));
+    return [ansi2, ansi2, ansi256, style.ansi16m];
   }
   if (model === "hex") {
-    return getModelAnsi2("rgb", level, type, ...ansi_styles_default.hexToRgb(...arguments_));
+    const ansi2 = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
+    const ansi256 = (hex) => style.ansi256(ansi_styles_default.hexToAnsi256(hex));
+    return [ansi2, ansi2, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
   }
-  return ansi_styles_default[type][model](...arguments_);
+  const ansi = (code) => style.ansi(ansi_styles_default.ansi256ToAnsi(code));
+  return [ansi, ansi, style.ansi256, style.ansi256];
 };
 var usedModels2 = ["rgb", "hex", "ansi256"];
 for (const model of usedModels2) {
-  styles3[model] = {
-    get() {
-      const { level } = this;
-      return function(...arguments_) {
-        const styler = createStyler2(getModelAnsi2(model, levelMapping2[level], "color", ...arguments_), ansi_styles_default.color.close, this[STYLER2]);
-        return createBuilder2(this, styler, this[IS_EMPTY2]);
-      };
-    }
-  };
-  const bgModel = "bg" + model[0].toUpperCase() + model.slice(1);
-  styles3[bgModel] = {
-    get() {
-      const { level } = this;
-      return function(...arguments_) {
-        const styler = createStyler2(getModelAnsi2(model, levelMapping2[level], "bgColor", ...arguments_), ansi_styles_default.bgColor.close, this[STYLER2]);
-        return createBuilder2(this, styler, this[IS_EMPTY2]);
-      };
-    }
-  };
+  const capitalizedModel = model[0].toUpperCase() + model.slice(1);
+  for (const [styleName, type] of [
+    [model, "color"],
+    ["bg" + capitalizedModel, "bgColor"],
+    ["underline" + capitalizedModel, "underlineColor"]
+  ]) {
+    const { close } = ansi_styles_default[type];
+    const converters = createModelConverters2(model, type);
+    styles3[styleName] = {
+      get() {
+        const styleFunction = function(first, second, third) {
+          const open = converters[this.level](first, second, third);
+          return createBuilder2(this, createStyler2(open, close, this[STYLER2]), this[IS_EMPTY2]);
+        };
+        Object.defineProperty(this, styleName, { value: styleFunction });
+        return styleFunction;
+      }
+    };
+  }
 }
 var proto2 = Object.defineProperties(() => {}, {
   ...styles3,
@@ -4434,15 +4504,23 @@ var createStyler2 = (open, close, parent) => {
   };
 };
 var createBuilder2 = (self, _styler, _isEmpty) => {
-  const builder = (...arguments_) => applyStyle2(builder, arguments_.length === 1 ? "" + arguments_[0] : arguments_.join(" "));
+  const builder = (...arguments_) => {
+    if (arguments_.length === 1) {
+      return applyStyle2(builder, "" + arguments_[0]);
+    }
+    if (arguments_.length === 2) {
+      return applyStyle2(builder, arguments_[0] + " " + arguments_[1]);
+    }
+    return applyStyle2(builder, arguments_.join(" "));
+  };
   Object.setPrototypeOf(builder, proto2);
-  builder[GENERATOR2] = self;
+  builder[GENERATOR2] = self[GENERATOR2] ?? self;
   builder[STYLER2] = _styler;
   builder[IS_EMPTY2] = _isEmpty;
   return builder;
 };
 var applyStyle2 = (self, string) => {
-  if (self.level <= 0 || !string) {
+  if (self[GENERATOR2][LEVEL2] <= 0 || !string) {
     return self[IS_EMPTY2] ? "" : string;
   }
   let styler = self[STYLER2];
@@ -4463,7 +4541,7 @@ var applyStyle2 = (self, string) => {
   }
   return openAll + string + closeAll;
 };
-Object.defineProperties(createChalk2.prototype, styles3);
+Object.defineProperties(createChalk2.prototype, { ...styles3, level: levelDescriptor2 });
 var chalk2 = createChalk2();
 var chalkStderr2 = createChalk2({ level: stderrColor2 ? stderrColor2.level : 0 });
 var source_default2 = chalk2;
@@ -5048,18 +5126,18 @@ class QueryAPI {
     if (!source) {
       throw new Error(`Source not found: ${sourceName}`);
     }
-    const tableName = `t${source.attributes.team_id}_${source.attributes.table_name}_logs`;
+    const tablePrefix = `t${source.attributes.team_id}_${source.attributes.table_name}`;
     const fields = options.fields && options.fields.length > 0 ? this.buildFieldSelection(options.fields) : "dt, raw";
-    let sql = `SELECT ${fields} FROM remote(${tableName})`;
-    const conditions = [];
+    const timeConditions = [];
     if (options.since) {
       const sinceDate = parseTimeString(options.since);
-      conditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
+      timeConditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
     }
     if (options.until) {
       const untilDate = parseTimeString(options.until);
-      conditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
+      timeConditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
     }
+    const conditions = [];
     if (effectiveLevel) {
       const escapedLevel = effectiveLevel.replace(/'/g, "''").toLowerCase();
       const levelExpression = `lowerUTF8(COALESCE(` + `JSONExtractString(raw, 'level'),` + `JSON_VALUE(raw, '$.level'),` + `JSON_VALUE(raw, '$.levelName'),` + `JSON_VALUE(raw, '$.vercel.level')
@@ -5096,8 +5174,20 @@ class QueryAPI {
         }
       }
     }
-    if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(" AND ")}`;
+    let sql;
+    if (options.hotOnly) {
+      sql = `SELECT ${fields} FROM remote(${tablePrefix}_logs)`;
+      const allConditions = [...timeConditions, ...conditions];
+      if (allConditions.length > 0) {
+        sql += ` WHERE ${allConditions.join(" AND ")}`;
+      }
+    } else {
+      const timeWhere = timeConditions.length > 0 ? ` WHERE ${timeConditions.join(" AND ")}` : "";
+      const coldTimeWhere = timeConditions.length > 0 ? ` AND ${timeConditions.join(" AND ")}` : "";
+      sql = `SELECT ${fields} FROM (SELECT dt, raw FROM remote(${tablePrefix}_logs)${timeWhere} UNION ALL SELECT dt, raw FROM s3Cluster(primary, ${tablePrefix}_s3) WHERE _row_type = 1${coldTimeWhere})`;
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(" AND ")}`;
+      }
     }
     sql += " ORDER BY dt DESC";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
@@ -5681,6 +5771,9 @@ async function tailLogs(options) {
   const queryOptions = {
     ...remainingOptions
   };
+  if (follow) {
+    queryOptions.hotOnly = true;
+  }
   const normalizedFields = normalizeFieldsOption(rawFields);
   if (normalizedFields) {
     queryOptions.fields = normalizedFields;
@@ -5957,6 +6050,9 @@ async function tailLogs2(options) {
   const queryOptions = {
     ...remainingOptions
   };
+  if (follow) {
+    queryOptions.hotOnly = true;
+  }
   const normalizedFields = normalizeFieldsOption2(rawFields);
   if (normalizedFields) {
     queryOptions.fields = normalizedFields;
@@ -6357,7 +6453,7 @@ function mergeWithRuntime(options, runtime, extras = {}) {
   return merged;
 }
 function applySharedLogOptions(command) {
-  command.option("-n, --limit <number>", "Number of logs to fetch", "100").option("--since <time>", "Time lower bound (e.g., 1h, 2d, 2024-01-01)").option("--until <time>", "Time upper bound (e.g., 2024-01-01T12:00)").option("--format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--fields <names>", "Comma-separated list of fields to select (e.g., dt,message,level)").option("--sources <names>", "Comma-separated list of sources to merge").option("--where <filter...>", "Filter JSON fields (field=value). Repeat to add multiple filters", collectWhereFilters, []).option("--jq <filter>", "Pipe JSON output through jq (requires jq in PATH)").option("-v, --verbose", "Show SQL query and debug information");
+  command.option("-n, --limit <number>", "Number of logs to fetch", "100").option("--since <time>", "Time lower bound (e.g., 1h, 2d, 2024-01-01)").option("--until <time>", "Time upper bound (e.g., 2024-01-01T12:00)").option("--format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--fields <names>", "Comma-separated list of fields to select (e.g., dt,message,level)").option("--sources <names>", "Comma-separated list of sources to merge").option("--hot-only", "Query hot storage only (faster, excludes archived logs)").option("--where <filter...>", "Filter JSON fields (field=value). Repeat to add multiple filters", collectWhereFilters, []).option("--jq <filter>", "Pipe JSON output through jq (requires jq in PATH)").option("-v, --verbose", "Show SQL query and debug information");
 }
 function stripRuntimeOptionProps(options) {
   const { limit: _limit, sources: _sources, where: _where, jq: _jq, ...rest } = options;
@@ -6390,7 +6486,7 @@ function extractStringOption(options, key) {
   const value = options[key];
   return typeof value === "string" ? value : undefined;
 }
-program2.command("query").argument("<query>", "GraphQL-like query string").option("-s, --source <name>", "Source name").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "pretty").option("-v, --verbose", "Show SQL query and debug information").description("Query logs using GraphQL-like syntax").action(async (query, options) => {
+program2.command("query").argument("<query>", "GraphQL-like query string").option("-s, --source <name>", "Source name").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "pretty").option("--hot-only", "Query hot storage only (faster, excludes archived logs)").option("-v, --verbose", "Show SQL query and debug information").description("Query logs using GraphQL-like syntax").action(async (query, options) => {
   await runQuery(query, options);
 });
 program2.command("sql").argument("<sql>", "Raw ClickHouse SQL query").option("-f, --format <type>", "Output format (json|table|csv|pretty)", "json").option("-v, --verbose", "Show SQL query and debug information").description("Execute raw ClickHouse SQL query").action(async (sql, options) => {

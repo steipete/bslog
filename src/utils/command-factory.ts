@@ -98,6 +98,7 @@ function applySharedLogOptions(command: Command): void {
     .option("--format <type>", "Output format (json|table|csv|pretty)", "pretty")
     .option("--fields <names>", "Comma-separated list of fields to select (e.g., dt,message,level)")
     .option("--sources <names>", "Comma-separated list of sources to merge")
+    .option("--hot-only", "Query hot storage only (faster, excludes archived logs)")
     .option(
       "--where <filter...>",
       "Filter JSON fields (field=value). Repeat to add multiple filters",
