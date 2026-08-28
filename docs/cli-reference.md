@@ -119,7 +119,7 @@ Configuration is stored at `~/.bslog/config.json`.
 
 Valid saved formats are `json`, `table`, `csv`, and `pretty`. Commands currently use their own output defaults unless `--format` is passed. Valid log levels are `all`, `debug`, `info`, `warning`, `error`, `fatal`, and `trace`; `warn` is normalized to `warning`.
 
-`BSLOG_QUERY_HOST` overrides the saved `queryBaseUrl`. Credentials are read from environment variables and are not written to this file. Query history is retained in the same file, up to 100 entries.
+`BSLOG_CONFIG_DIR` overrides the directory containing `config.json`; unset or empty values use `~/.bslog`. `BSLOG_QUERY_HOST` overrides the saved `queryBaseUrl`. Credentials are read from environment variables and are not written to this file. Query history is retained in the same file, up to 100 entries.
 
 ## Built-in source aliases
 

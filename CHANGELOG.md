@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.5.4] - Unreleased
 
+- Added `BSLOG_CONFIG_DIR` to override the config directory and keep config tests hermetic without modifying `~/.bslog`.
 - Updated Chalk to 6.0.0, Bun and its types to 1.4.0, Node types to 26.4.0, oxfmt to 0.65.0, and oxlint to 1.80.0; refreshed the dependency lockfile and CI runtime pin.
 
 ## [1.5.3] - 2026-08-13

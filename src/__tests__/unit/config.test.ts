@@ -1,37 +1,94 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { existsSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { showConfig } from "../../commands/config";
 import {
   addToHistory,
   DEFAULT_QUERY_BASE_URL,
+  getConfigDir,
+  getConfigFile,
   loadConfig,
   saveConfig,
   updateConfig,
 } from "../../utils/config";
 
 describe("Config Utilities", () => {
-  const CONFIG_DIR = join(homedir(), ".bslog");
-  const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-  const BACKUP_FILE = join(CONFIG_DIR, "config.json.backup");
+  let CONFIG_DIR: string;
+  let CONFIG_FILE: string;
+  let originalConfigDir: string | undefined;
+  const realFile = join(homedir(), ".bslog", "config.json");
+  let realFileExists: boolean;
+  let realFileContent: Buffer | undefined;
 
-  beforeEach(() => {
-    // Backup existing config if it exists
-    if (existsSync(CONFIG_FILE)) {
-      require("node:fs").copyFileSync(CONFIG_FILE, BACKUP_FILE);
+  beforeAll(() => {
+    realFileExists = existsSync(realFile);
+    if (realFileExists) {
+      realFileContent = readFileSync(realFile);
     }
   });
 
-  afterEach(() => {
-    // Restore backup if it exists
-    if (existsSync(BACKUP_FILE)) {
-      require("node:fs").copyFileSync(BACKUP_FILE, CONFIG_FILE);
-      rmSync(BACKUP_FILE);
-    } else if (existsSync(CONFIG_FILE)) {
-      // Clean up test config if no backup
-      rmSync(CONFIG_FILE);
+  afterAll(() => {
+    expect(existsSync(realFile)).toBe(realFileExists);
+    if (realFileContent !== undefined) {
+      expect(readFileSync(realFile).equals(realFileContent)).toBe(true);
     }
+  });
+
+  beforeEach(() => {
+    originalConfigDir = process.env.BSLOG_CONFIG_DIR;
+    CONFIG_DIR = mkdtempSync(join(tmpdir(), "bslog-test-"));
+    CONFIG_FILE = join(CONFIG_DIR, "config.json");
+    process.env.BSLOG_CONFIG_DIR = CONFIG_DIR;
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(CONFIG_DIR, { recursive: true, force: true });
+    } finally {
+      if (originalConfigDir === undefined) {
+        delete process.env.BSLOG_CONFIG_DIR;
+      } else {
+        process.env.BSLOG_CONFIG_DIR = originalConfigDir;
+      }
+    }
+  });
+
+  describe("config path isolation", () => {
+    it("should use the temporary config directory instead of the real home path", () => {
+      expect(getConfigDir()).toBe(CONFIG_DIR);
+      expect(getConfigFile()).toBe(CONFIG_FILE);
+      expect(getConfigFile().startsWith(join(homedir(), ".bslog"))).toBe(false);
+    });
+
+    it("should resolve config paths on every invocation", () => {
+      saveConfig({ defaultLimit: 150 });
+
+      const otherConfigDir = join(CONFIG_DIR, "other");
+      process.env.BSLOG_CONFIG_DIR = otherConfigDir;
+
+      expect(getConfigDir()).toBe(otherConfigDir);
+      expect(getConfigFile()).toBe(join(otherConfigDir, "config.json"));
+      expect(loadConfig().defaultLimit).toBe(100);
+
+      saveConfig({ defaultLimit: 250 });
+      expect(loadConfig().defaultLimit).toBe(250);
+
+      process.env.BSLOG_CONFIG_DIR = CONFIG_DIR;
+      expect(loadConfig().defaultLimit).toBe(150);
+    });
+
+    it.each([undefined, ""])("should use the default path when the override is %p", (override) => {
+      if (override === undefined) {
+        delete process.env.BSLOG_CONFIG_DIR;
+      } else {
+        process.env.BSLOG_CONFIG_DIR = override;
+      }
+
+      // Resolve paths only; never load or save the real home config.
+      expect(getConfigDir()).toBe(join(homedir(), ".bslog"));
+      expect(getConfigFile()).toBe(realFile);
+    });
   });
 
   describe("loadConfig", () => {
