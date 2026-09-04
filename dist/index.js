@@ -20,7 +20,7 @@ var __toESM = (mod, isNodeMode, target) => {
       return cached;
   }
   target = mod != null ? __create(__getProtoOf(mod)) : {};
-  const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
+  const to = isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
   if (mod && typeof mod === "object" || typeof mod === "function") {
     for (let key of __getOwnPropNames(mod))
       if (!__hasOwnProp.call(to, key))
@@ -152,23 +152,23 @@ var require_utils = __commonJS(function(exports, module) {
   function repeat(str, times) {
     return Array(times + 1).join(str);
   }
-  function pad(str, len, pad2, dir) {
+  function pad(str, len, pad, dir) {
     let length = strlen(str);
     if (len + 1 >= length) {
       let padlen = len - length;
       switch (dir) {
         case "right": {
-          str = repeat(pad2, padlen) + str;
+          str = repeat(pad, padlen) + str;
           break;
         }
         case "center": {
           let right = Math.ceil(padlen / 2);
           let left = padlen - right;
-          str = repeat(pad2, left) + str + repeat(pad2, right);
+          str = repeat(pad, left) + str + repeat(pad, right);
           break;
         }
         default: {
-          str = str + repeat(pad2, padlen);
+          str = str + repeat(pad, padlen);
           break;
         }
       }
@@ -440,8 +440,8 @@ var require_utils = __commonJS(function(exports, module) {
 
 // node_modules/@colors/colors/lib/styles.js
 var require_styles = __commonJS(function(exports, module) {
-  var styles4 = {};
-  module["exports"] = styles4;
+  var styles = {};
+  module["exports"] = styles;
   var codes = {
     reset: [0, 0],
     bold: [1, 22],
@@ -496,7 +496,7 @@ var require_styles = __commonJS(function(exports, module) {
   };
   Object.keys(codes).forEach(function(key) {
     var val = codes[key];
-    var style = styles4[key] = [];
+    var style = styles[key] = [];
     style.open = "\x1B[" + val[0] + "m";
     style.close = "\x1B[" + val[1] + "m";
   });
@@ -515,19 +515,19 @@ var require_has_flag = __commonJS(function(exports, module) {
 
 // node_modules/@colors/colors/lib/system/supports-colors.js
 var require_supports_colors = __commonJS(function(exports, module) {
-  var os2 = __require("os");
-  var hasFlag2 = require_has_flag();
-  var env2 = process.env;
+  var os = __require("os");
+  var hasFlag = require_has_flag();
+  var env = process.env;
   var forceColor = undefined;
-  if (hasFlag2("no-color") || hasFlag2("no-colors") || hasFlag2("color=false")) {
+  if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false")) {
     forceColor = false;
-  } else if (hasFlag2("color") || hasFlag2("colors") || hasFlag2("color=true") || hasFlag2("color=always")) {
+  } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
     forceColor = true;
   }
-  if ("FORCE_COLOR" in env2) {
-    forceColor = env2.FORCE_COLOR.length === 0 || parseInt(env2.FORCE_COLOR, 10) !== 0;
+  if ("FORCE_COLOR" in env) {
+    forceColor = env.FORCE_COLOR.length === 0 || parseInt(env.FORCE_COLOR, 10) !== 0;
   }
-  function translateLevel2(level) {
+  function translateLevel(level) {
     if (level === 0) {
       return false;
     }
@@ -538,14 +538,14 @@ var require_supports_colors = __commonJS(function(exports, module) {
       has16m: level >= 3
     };
   }
-  function supportsColor2(stream) {
+  function supportsColor(stream) {
     if (forceColor === false) {
       return 0;
     }
-    if (hasFlag2("color=16m") || hasFlag2("color=full") || hasFlag2("color=truecolor")) {
+    if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
       return 3;
     }
-    if (hasFlag2("color=256")) {
+    if (hasFlag("color=256")) {
       return 2;
     }
     if (stream && !stream.isTTY && forceColor !== true) {
@@ -553,26 +553,26 @@ var require_supports_colors = __commonJS(function(exports, module) {
     }
     var min = forceColor ? 1 : 0;
     if (process.platform === "win32") {
-      var osRelease = os2.release().split(".");
+      var osRelease = os.release().split(".");
       if (Number(process.versions.node.split(".")[0]) >= 8 && Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
         return Number(osRelease[2]) >= 14931 ? 3 : 2;
       }
       return 1;
     }
-    if ("CI" in env2) {
+    if ("CI" in env) {
       if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI"].some(function(sign) {
-        return sign in env2;
-      }) || env2.CI_NAME === "codeship") {
+        return sign in env;
+      }) || env.CI_NAME === "codeship") {
         return 1;
       }
       return min;
     }
-    if ("TEAMCITY_VERSION" in env2) {
-      return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env2.TEAMCITY_VERSION) ? 1 : 0;
+    if ("TEAMCITY_VERSION" in env) {
+      return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
     }
-    if ("TERM_PROGRAM" in env2) {
-      var version = parseInt((env2.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-      switch (env2.TERM_PROGRAM) {
+    if ("TERM_PROGRAM" in env) {
+      var version = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+      switch (env.TERM_PROGRAM) {
         case "iTerm.app":
           return version >= 3 ? 3 : 2;
         case "Hyper":
@@ -581,23 +581,23 @@ var require_supports_colors = __commonJS(function(exports, module) {
           return 2;
       }
     }
-    if (/-256(color)?$/i.test(env2.TERM)) {
+    if (/-256(color)?$/i.test(env.TERM)) {
       return 2;
     }
-    if (/^screen|^xterm|^vt100|^rxvt|color|ansi|cygwin|linux/i.test(env2.TERM)) {
+    if (/^screen|^xterm|^vt100|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
       return 1;
     }
-    if ("COLORTERM" in env2) {
+    if ("COLORTERM" in env) {
       return 1;
     }
-    if (env2.TERM === "dumb") {
+    if (env.TERM === "dumb") {
       return min;
     }
     return min;
   }
   function getSupportLevel(stream) {
-    var level = supportsColor2(stream);
-    return translateLevel2(level);
+    var level = supportsColor(stream);
+    return translateLevel(level);
   }
   module.exports = {
     supportsColor: getSupportLevel,
@@ -809,23 +809,23 @@ var require_zalgo = __commonJS(function(exports, module) {
       });
       return bool;
     }
-    function heComes(text2, options2) {
+    function heComes(text, options) {
       var result = "";
       var counts;
       var l;
-      options2 = options2 || {};
-      options2["up"] = typeof options2["up"] !== "undefined" ? options2["up"] : true;
-      options2["mid"] = typeof options2["mid"] !== "undefined" ? options2["mid"] : true;
-      options2["down"] = typeof options2["down"] !== "undefined" ? options2["down"] : true;
-      options2["size"] = typeof options2["size"] !== "undefined" ? options2["size"] : "maxi";
-      text2 = text2.split("");
-      for (l in text2) {
+      options = options || {};
+      options["up"] = typeof options["up"] !== "undefined" ? options["up"] : true;
+      options["mid"] = typeof options["mid"] !== "undefined" ? options["mid"] : true;
+      options["down"] = typeof options["down"] !== "undefined" ? options["down"] : true;
+      options["size"] = typeof options["size"] !== "undefined" ? options["size"] : "maxi";
+      text = text.split("");
+      for (l in text) {
         if (isChar(l)) {
           continue;
         }
-        result = result + text2[l];
+        result = result + text[l];
         counts = { up: 0, down: 0, mid: 0 };
-        switch (options2.size) {
+        switch (options.size) {
           case "mini":
             counts.up = randomNumber(8);
             counts.mid = randomNumber(2);
@@ -846,7 +846,7 @@ var require_zalgo = __commonJS(function(exports, module) {
         for (var d in arr) {
           var index = arr[d];
           for (var i = 0;i <= counts[index]; i++) {
-            if (options2[index]) {
+            if (options[index]) {
               result = result + soul[index][randomNumber(soul[index].length)];
             }
           }
@@ -933,7 +933,7 @@ var require_colors = __commonJS(function(exports, module) {
   module["exports"] = colors;
   colors.themes = {};
   var util = __require("util");
-  var ansiStyles2 = colors.styles = require_styles();
+  var ansiStyles = colors.styles = require_styles();
   var defineProps = Object.defineProperties;
   var newLineRegex = new RegExp(/[\r\n]+/g);
   colors.supportsColor = require_supports_colors().supportsColor;
@@ -949,11 +949,11 @@ var require_colors = __commonJS(function(exports, module) {
   colors.stripColors = colors.strip = function(str) {
     return ("" + str).replace(/\x1B\[\d+m/g, "");
   };
-  var stylize = colors.stylize = function stylize2(str, style) {
+  var stylize = colors.stylize = function stylize(str, style) {
     if (!colors.enabled) {
       return str + "";
     }
-    var styleMap = ansiStyles2[style];
+    var styleMap = ansiStyles[style];
     if (!styleMap && style in colors) {
       return colors[style](str);
     }
@@ -967,18 +967,18 @@ var require_colors = __commonJS(function(exports, module) {
     return str.replace(matchOperatorsRe, "\\$&");
   };
   function build(_styles) {
-    var builder = function builder2() {
-      return applyStyle3.apply(builder2, arguments);
+    var builder = function builder() {
+      return applyStyle.apply(builder, arguments);
     };
     builder._styles = _styles;
-    builder.__proto__ = proto3;
+    builder.__proto__ = proto;
     return builder;
   }
-  var styles4 = function() {
+  var styles = function() {
     var ret = {};
-    ansiStyles2.grey = ansiStyles2.gray;
-    Object.keys(ansiStyles2).forEach(function(key) {
-      ansiStyles2[key].closeRe = new RegExp(escapeStringRegexp(ansiStyles2[key].close), "g");
+    ansiStyles.grey = ansiStyles.gray;
+    Object.keys(ansiStyles).forEach(function(key) {
+      ansiStyles[key].closeRe = new RegExp(escapeStringRegexp(ansiStyles[key].close), "g");
       ret[key] = {
         get: function() {
           return build(this._styles.concat(key));
@@ -987,8 +987,8 @@ var require_colors = __commonJS(function(exports, module) {
     });
     return ret;
   }();
-  var proto3 = defineProps(function colors2() {}, styles4);
-  function applyStyle3() {
+  var proto = defineProps(function colors() {}, styles);
+  function applyStyle() {
     var args = Array.prototype.slice.call(arguments);
     var str = args.map(function(arg) {
       if (arg != null && arg.constructor === String) {
@@ -1005,7 +1005,7 @@ var require_colors = __commonJS(function(exports, module) {
     var nestedStyles = this._styles;
     var i = nestedStyles.length;
     while (i--) {
-      var code = ansiStyles2[nestedStyles[i]];
+      var code = ansiStyles[nestedStyles[i]];
       str = code.open + str.replace(code.closeRe, code.open) + code.close;
       if (newLinesPresent) {
         str = str.replace(newLineRegex, function(match) {
@@ -1021,23 +1021,23 @@ var require_colors = __commonJS(function(exports, module) {
       return;
     }
     for (var style in theme) {
-      (function(style2) {
-        colors[style2] = function(str) {
-          if (typeof theme[style2] === "object") {
+      (function(style) {
+        colors[style] = function(str) {
+          if (typeof theme[style] === "object") {
             var out = str;
-            for (var i in theme[style2]) {
-              out = colors[theme[style2][i]](out);
+            for (var i in theme[style]) {
+              out = colors[theme[style][i]](out);
             }
             return out;
           }
-          return colors[theme[style2]](str);
+          return colors[theme[style]](str);
         };
       })(style);
     }
   };
   function init() {
     var ret = {};
-    Object.keys(styles4).forEach(function(name) {
+    Object.keys(styles).forEach(function(name) {
       ret[name] = {
         get: function() {
           return build([name]);
@@ -1046,9 +1046,9 @@ var require_colors = __commonJS(function(exports, module) {
     });
     return ret;
   }
-  var sequencer = function sequencer2(map2, str) {
+  var sequencer = function sequencer(map, str) {
     var exploded = str.split("");
-    exploded = exploded.map(map2);
+    exploded = exploded.map(map);
     return exploded.join("");
   };
   colors.trap = require_trap();
@@ -1059,9 +1059,9 @@ var require_colors = __commonJS(function(exports, module) {
   colors.maps.rainbow = require_rainbow()(colors);
   colors.maps.random = require_random()(colors);
   for (map in colors.maps) {
-    (function(map2) {
-      colors[map2] = function(str) {
-        return sequencer(colors.maps[map2], str);
+    (function(map) {
+      colors[map] = function(str) {
+        return sequencer(colors.maps[map], str);
       };
     })(map);
   }
@@ -1132,8 +1132,8 @@ var require_cell = __commonJS(function(exports, module) {
     }
     computeLines(tableOptions) {
       const tableWordWrap = tableOptions.wordWrap || tableOptions.textWrap;
-      const { wordWrap = tableWordWrap } = this.options;
-      if (this.fixedWidth && wordWrap) {
+      const { wordWrap: wordWrap2 = tableWordWrap } = this.options;
+      if (this.fixedWidth && wordWrap2) {
         this.fixedWidth -= this.paddingLeft + this.paddingRight;
         if (this.colSpan) {
           let i = 1;
@@ -2160,14 +2160,14 @@ styles2.visible = {
 var createModelConverters = (model, type) => {
   const style = ansi_styles_default[type];
   if (model === "rgb") {
-    const ansi2 = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
+    const ansi = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
     const ansi256 = (red, green, blue) => style.ansi256(ansi_styles_default.rgbToAnsi256(red, green, blue));
-    return [ansi2, ansi2, ansi256, style.ansi16m];
+    return [ansi, ansi, ansi256, style.ansi16m];
   }
   if (model === "hex") {
-    const ansi2 = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
+    const ansi = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
     const ansi256 = (hex) => style.ansi256(ansi_styles_default.hexToAnsi256(hex));
-    return [ansi2, ansi2, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
+    return [ansi, ansi, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
   }
   const ansi = (code) => style.ansi(ansi_styles_default.ansi256ToAnsi(code));
   return [ansi, ansi, style.ansi256, style.ansi256];
@@ -2384,7 +2384,7 @@ class Help {
     this.helpWidth = this.helpWidth ?? contextOptions.helpWidth ?? 80;
   }
   visibleCommands(cmd) {
-    const visibleCommands = cmd.commands.filter((cmd2) => !cmd2._hidden);
+    const visibleCommands = cmd.commands.filter((cmd) => !cmd._hidden);
     const helpCommand = cmd._getHelpCommand();
     if (helpCommand && !helpCommand._hidden) {
       visibleCommands.push(helpCommand);
@@ -2854,8 +2854,8 @@ class DualOptions {
   }
 }
 function camelcase(str) {
-  return str.split("-").reduce((str2, word) => {
-    return str2 + word[0].toUpperCase() + word.slice(1);
+  return str.split("-").reduce((str, word) => {
+    return str + word[0].toUpperCase() + word.slice(1);
   });
 }
 function splitOptionFlags(flags) {
@@ -3968,18 +3968,18 @@ Expecting one of '${allowedValues.join("', '")}'`);
     this.error(message, { code: "commander.missingMandatoryOptionValue" });
   }
   _conflictingOption(option, conflictingOption) {
-    const findBestOptionFromValue = (option2) => {
-      const optionKey = option2.attributeName();
+    const findBestOptionFromValue = (option) => {
+      const optionKey = option.attributeName();
       const optionValue = this.getOptionValue(optionKey);
       const negativeOption = this.options.find((target) => target.negate && optionKey === target.attributeName());
       const positiveOption = this.options.find((target) => !target.negate && optionKey === target.attributeName());
       if (negativeOption && (negativeOption.presetArg === undefined && optionValue === false || negativeOption.presetArg !== undefined && optionValue === negativeOption.presetArg)) {
         return negativeOption;
       }
-      return positiveOption || option2;
+      return positiveOption || option;
     };
-    const getErrorMessage = (option2) => {
-      const bestOption = findBestOptionFromValue(option2);
+    const getErrorMessage = (option) => {
+      const bestOption = findBestOptionFromValue(option);
       const optionKey = bestOption.attributeName();
       const source = this.getOptionValueSource(optionKey);
       if (source === "env") {
@@ -4350,8 +4350,8 @@ var package_default = {
     build: "bun build ./src/index.ts --compile --outfile dist/bslog",
     "build:npm": "bun build ./src/index.ts --target node --outfile dist/index.js && chmod +x dist/index.js",
     "build:all": "bun run build && bun run build:npm",
-    test: "bun test --max-concurrency=1 src/__tests__/unit/config.test.ts && bun test --max-concurrency=1 src/__tests__/unit/client-simple.test.ts src/__tests__/unit/formatter.test.ts src/__tests__/unit/options.test.ts src/__tests__/unit/parser.test.ts src/__tests__/unit/tail-jq.test.ts src/__tests__/unit/tail-multi-source.test.ts src/__tests__/unit/time.test.ts src/__tests__/unit/trace.test.ts src/__tests__/integration/query-builder.test.ts",
-    "test:unit": "bun test --max-concurrency=1 src/__tests__/unit/config.test.ts && bun test --max-concurrency=1 src/__tests__/unit/client-simple.test.ts src/__tests__/unit/formatter.test.ts src/__tests__/unit/options.test.ts src/__tests__/unit/parser.test.ts src/__tests__/unit/tail-jq.test.ts src/__tests__/unit/tail-multi-source.test.ts src/__tests__/unit/time.test.ts src/__tests__/unit/trace.test.ts",
+    test: "bun test --max-concurrency=1",
+    "test:unit": "bun test --max-concurrency=1 src/__tests__/unit",
     "test:integration": "bun test --max-concurrency=1 src/__tests__/integration",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
@@ -4370,15 +4370,15 @@ var package_default = {
   },
   devDependencies: {
     "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.0",
-    oxfmt: "^0.65.0",
-    oxlint: "^1.80.0",
+    "@types/node": "^26.4.1",
+    oxfmt: "^0.66.0",
+    oxlint: "^1.81.0",
     typescript: "^7.0.2"
   },
   engines: {
     bun: ">=1.0.0"
   },
-  packageManager: "bun@1.4.0"
+  packageManager: "bun@1.4.1"
 };
 
 // node_modules/chalk/source/index.js
@@ -4411,10 +4411,10 @@ var applyOptions2 = (object, options = {}) => {
   object[LEVEL2] = options.level === undefined ? colorLevel : options.level;
 };
 var chalkFactory2 = (options) => {
-  const chalk2 = (...strings) => strings.join(" ");
-  applyOptions2(chalk2, options);
-  Object.setPrototypeOf(chalk2, createChalk2.prototype);
-  return chalk2;
+  const chalk = (...strings) => strings.join(" ");
+  applyOptions2(chalk, options);
+  Object.setPrototypeOf(chalk, createChalk2.prototype);
+  return chalk;
 };
 function createChalk2(options) {
   return chalkFactory2(options);
@@ -4439,14 +4439,14 @@ styles3.visible = {
 var createModelConverters2 = (model, type) => {
   const style = ansi_styles_default[type];
   if (model === "rgb") {
-    const ansi2 = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
+    const ansi = (red, green, blue) => style.ansi(ansi_styles_default.rgbToAnsi(red, green, blue));
     const ansi256 = (red, green, blue) => style.ansi256(ansi_styles_default.rgbToAnsi256(red, green, blue));
-    return [ansi2, ansi2, ansi256, style.ansi16m];
+    return [ansi, ansi, ansi256, style.ansi16m];
   }
   if (model === "hex") {
-    const ansi2 = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
+    const ansi = (hex) => style.ansi(ansi_styles_default.hexToAnsi(hex));
     const ansi256 = (hex) => style.ansi256(ansi_styles_default.hexToAnsi256(hex));
-    return [ansi2, ansi2, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
+    return [ansi, ansi, ansi256, (hex) => style.ansi16m(...ansi_styles_default.hexToRgb(hex))];
   }
   const ansi = (code) => style.ansi(ansi_styles_default.ansi256ToAnsi(code));
   return [ansi, ansi, style.ansi256, style.ansi256];
@@ -4550,8 +4550,12 @@ var source_default2 = chalk2;
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-var CONFIG_DIR = join(homedir(), ".bslog");
-var CONFIG_FILE = join(CONFIG_DIR, "config.json");
+function getConfigDir() {
+  return process.env.BSLOG_CONFIG_DIR || join(homedir(), ".bslog");
+}
+function getConfigFile() {
+  return join(getConfigDir(), "config.json");
+}
 var DEFAULT_QUERY_BASE_URL = "https://eu-nbg-2-connect.betterstackdata.com";
 function getApiToken() {
   const token = process.env.BETTERSTACK_API_TOKEN;
@@ -4568,7 +4572,8 @@ function getQueryCredentials() {
   return { username, password };
 }
 function loadConfig() {
-  if (!existsSync(CONFIG_FILE)) {
+  const configFile = getConfigFile();
+  if (!existsSync(configFile)) {
     return {
       defaultLimit: 100,
       outputFormat: "json",
@@ -4578,7 +4583,7 @@ function loadConfig() {
     };
   }
   try {
-    const content = readFileSync(CONFIG_FILE, "utf-8");
+    const content = readFileSync(configFile, "utf-8");
     const parsed = JSON.parse(content);
     if (!parsed.defaultLogLevel) {
       parsed.defaultLogLevel = "all";
@@ -4594,10 +4599,11 @@ function loadConfig() {
   }
 }
 function saveConfig(config) {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+  const configDir = getConfigDir();
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true });
   }
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
 }
 function updateConfig(updates) {
   const config = loadConfig();
@@ -4824,8 +4830,8 @@ class BetterStackClient {
       dispose();
     }
   }
-  telemetry(path2, options = {}) {
-    const url = `${TELEMETRY_BASE_URL}${path2}`;
+  telemetry(path, options = {}) {
+    const url = `${TELEMETRY_BASE_URL}${path}`;
     return this.request(url, options);
   }
   async query(sql, username, password) {
@@ -5061,22 +5067,22 @@ class QueryAPI {
         flushPlain();
       }
     }
-    let path2 = "$";
+    let path = "$";
     for (const segment of segments) {
       if (!segment) {
         continue;
       }
       if (segment.startsWith("[")) {
-        path2 += this.normalizeBracketSegment(segment);
+        path += this.normalizeBracketSegment(segment);
       } else {
-        path2 += this.normalizePlainSegment(segment);
+        path += this.normalizePlainSegment(segment);
       }
     }
-    return path2;
+    return path;
   }
   buildJsonAccessor(field) {
-    const path2 = this.buildJsonPath(field);
-    return `JSON_VALUE(raw, '${path2}')`;
+    const path = this.buildJsonPath(field);
+    return `JSON_VALUE(raw, '${path}')`;
   }
   normalizePlainSegment(segment) {
     const cleaned = segment.trim();
@@ -5104,8 +5110,8 @@ class QueryAPI {
     const isQuoted = quote === '"' || quote === "'";
     if (isQuoted && inner[inner.length - 1] === quote) {
       const key = inner.slice(1, -1).replace(/\\(['"])/g, "$1");
-      const escaped2 = key.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-      return `["${escaped2}"]`;
+      const escaped = key.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+      return `["${escaped}"]`;
     }
     if (/^-?\d+$/.test(inner)) {
       return `[${inner}]`;
@@ -5868,21 +5874,21 @@ async function runMultiSource(api, baseOptions, runtime, sources) {
   const outputFormat = resolveFormat(runtime.format, runtime.jq);
   const limit = baseOptions.limit ?? 100;
   const perSourceLatest = new Map;
-  const collect = async (sinceMap, limitOverride, fallbackSince2) => {
+  const collect = async (sinceMap, limitOverride, fallbackSince) => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
-    const latestBySource2 = new Map;
+    const latestBySource = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
         source,
         limit: limitPerSource
       };
-      const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince2;
+      const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
       const result = await api.execute(perSourceOptions);
       if (result.length > 0) {
-        latestBySource2.set(source, result[0].dt);
+        latestBySource.set(source, result[0].dt);
         for (const entry of result) {
           combined.push({ ...entry, source });
         }
@@ -5896,7 +5902,7 @@ async function runMultiSource(api, baseOptions, runtime, sources) {
     });
     return {
       combined: combined.slice(0, limitPerSource),
-      latestBySource: latestBySource2
+      latestBySource
     };
   };
   const { combined: initialCombined, latestBySource } = await collect();
@@ -6147,21 +6153,21 @@ async function runMultiSource2(api, baseOptions, runtime, sources) {
   const outputFormat = resolveFormat2(runtime.format, runtime.jq);
   const limit = baseOptions.limit ?? 100;
   const perSourceLatest = new Map;
-  const collect = async (sinceMap, limitOverride, fallbackSince2) => {
+  const collect = async (sinceMap, limitOverride, fallbackSince) => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
-    const latestBySource2 = new Map;
+    const latestBySource = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
         source,
         limit: limitPerSource
       };
-      const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince2;
+      const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
       const result = await api.execute(perSourceOptions);
       if (result.length > 0) {
-        latestBySource2.set(source, result[0].dt);
+        latestBySource.set(source, result[0].dt);
         for (const entry of result) {
           combined.push({ ...entry, source });
         }
@@ -6175,7 +6181,7 @@ async function runMultiSource2(api, baseOptions, runtime, sources) {
     });
     return {
       combined: combined.slice(0, limitPerSource),
-      latestBySource: latestBySource2
+      latestBySource
     };
   };
   const { combined: initialCombined, latestBySource } = await collect();
@@ -6407,8 +6413,8 @@ var collectWhereFilters = (value, previous = []) => [
   ...previous,
   value
 ];
-function registerLogCommand(program2, config) {
-  const command = program2.command(config.name);
+function registerLogCommand(program, config) {
+  const command = program.command(config.name);
   command.description(config.description);
   if (config.arguments) {
     for (const arg of config.arguments) {
@@ -6462,11 +6468,11 @@ function stripRuntimeOptionProps(options) {
 
 // src/index.ts
 try {
-  const fs2 = __require("fs");
-  const path2 = __require("path");
-  const envPath = path2.resolve(process.cwd(), ".env");
-  if (fs2.existsSync(envPath)) {
-    const envContent = fs2.readFileSync(envPath, "utf8");
+  const fs = __require("fs");
+  const path = __require("path");
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, "utf8");
     envContent.split(`
 `).forEach((line) => {
       const [key, ...valueParts] = line.split("=");
