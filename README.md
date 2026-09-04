@@ -107,6 +107,8 @@ bun run build:npm
 
 `bun run ci` checks formatting, linting, types, tests, and the npm bundle. The standalone Bun binary is built with `bun run build`.
 
+Commit the regenerated `dist/index.js` when source or build-tool changes affect the npm bundle. GitHub CI rebuilds it and verifies that the entrypoint is tracked and matches the committed version. This check covers the npm bundle only; the standalone binary is built separately.
+
 Config tests run in a subprocess with a disposable home and a fresh `BSLOG_CONFIG_DIR` for each test. The regression wrapper checks that the default home config and inherited config directory remain untouched, without inspecting the developer's real files. Run it alone with `bun test src/__tests__/unit/config.test.ts`; plain `bun test` also includes it.
 
 ## License
