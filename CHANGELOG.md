@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - Unreleased
+
 ## [1.6.0] - 2026-09-13
 
 **Highlights:** Choose a custom configuration directory with `BSLOG_CONFIG_DIR`, now included in the verified npm bundle.
