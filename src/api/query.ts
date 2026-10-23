@@ -313,11 +313,28 @@ export class QueryAPI {
 
   executeSql(sql: string): Promise<Record<string, unknown>[]> {
     let statement = sql;
-    if (!statement.toLowerCase().includes("format")) {
-      statement = `${statement} FORMAT JSONEachRow`;
+    if (!hasOutputFormat(statement)) {
+      const lastCodeIndex = maskSql(statement).trimEnd().length - 1;
+      if (statement[lastCodeIndex] === ";") {
+        statement = statement.slice(0, lastCodeIndex) + statement.slice(lastCodeIndex + 1);
+      }
+      statement = `${statement}\nFORMAT JSONEachRow`;
     }
 
     const { username, password } = getQueryCredentials();
     return this.client.query<Record<string, unknown>>(statement, username, password);
   }
+}
+
+export function hasOutputFormat(statement: string): boolean {
+  return /\bformat\s+(?!as\b|from\b)[a-z][a-z0-9_]*(?:\s+settings\b[\s\S]*)?\s*;?\s*$/i.test(
+    maskSql(statement),
+  );
+}
+
+function maskSql(statement: string): string {
+  return statement.replace(
+    /'(?:\\.|''|[^'\\])*'|"(?:\\.|""|[^"\\])*"|`(?:\\.|``|[^`\\])*`|--[^\r\n]*|#[^\r\n]*|\/\*[\s\S]*?\*\//g,
+    (text) => text.replace(/[^\r\n]/g, " "),
+  );
 }

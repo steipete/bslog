@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [1.6.1] - Unreleased
 
+- Keep ClickHouse timestamps in UTC during follow polling, including fractional seconds. Thanks @SebTardif.
+- Preserve quoted delimiters and nested values in structured query filters. Thanks @SebTardif.
+- Add JSON output formatting for SQL functions such as `formatDateTime`, ignoring format-like text in strings and comments. Thanks @SebTardif.
+
 ## [1.6.0] - 2026-09-13
 
 **Highlights:** Choose a custom configuration directory with `BSLOG_CONFIG_DIR`, now included in the verified npm bundle.

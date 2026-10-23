@@ -82,53 +82,12 @@ export function parseGraphQLQuery(query: string): QueryOptions {
 
 function parseArguments(argsStr: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-
-  // Simple regex-based parser for arguments
-  // This handles: key: value, key: 'string', key: 123, key: { ... }, key: [ ... ]
-
-  let currentKey = "";
-  let currentValue = "";
-  let depth = 0;
-  let inString = false;
-  let stringChar = "";
-
-  for (let i = 0; i < argsStr.length; i++) {
-    const char = argsStr[i];
-
-    if (inString) {
-      if (char === stringChar && argsStr[i - 1] !== "\\") {
-        inString = false;
-      }
-      currentValue += char;
-    } else if (char === '"' || char === "'") {
-      inString = true;
-      stringChar = char;
-      currentValue += char;
-    } else if (char === "{" || char === "[") {
-      depth++;
-      currentValue += char;
-    } else if (char === "}" || char === "]") {
-      depth--;
-      currentValue += char;
-    } else if (char === ":" && depth === 0 && !currentKey) {
-      currentKey = currentValue.trim();
-      currentValue = "";
-    } else if (char === "," && depth === 0) {
-      if (currentKey) {
-        result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
-        currentKey = "";
-        currentValue = "";
-      }
-    } else {
-      currentValue += char;
+  for (const argument of splitTopLevel(argsStr, ",")) {
+    const [key, value] = splitTopLevel(argument, ":", 2).map((part) => part.trim());
+    if (key && value) {
+      result[key] = parseArgumentValue(key, value);
     }
   }
-
-  // Handle last key-value pair
-  if (currentKey && currentValue) {
-    result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
-  }
-
   return result;
 }
 
@@ -142,6 +101,41 @@ function parseArgumentValue(key: string, value: string): unknown {
 
 function parseLimitValue(value: string): number | undefined {
   return normalizeLimitValue(parseQuotedString(value) ?? value);
+}
+
+function splitTopLevel(input: string, separator: string, maxParts = Infinity): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let quote: string | null = null;
+  let depth = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "{" || char === "[") {
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+    } else if (char === separator && depth === 0) {
+      parts.push(input.slice(start, index));
+      start = index + 1;
+      if (parts.length === maxParts - 1) {
+        break;
+      }
+    }
+  }
+  if (input.slice(start).trim()) {
+    parts.push(input.slice(start));
+  }
+  return parts;
 }
 
 function parseValue(value: string): unknown {
@@ -170,10 +164,14 @@ function parseValue(value: string): unknown {
       // Simple object parser
       const objStr = value.slice(1, -1);
       const obj: Record<string, unknown> = {};
-      const pairs = objStr.split(",");
+      const pairs = splitTopLevel(objStr, ",");
 
       for (const pair of pairs) {
-        const [key, val] = pair.split(":").map((s) => s.trim());
+        const keyValue = splitTopLevel(pair, ":", 2).map((part) => part.trim());
+        if (keyValue.length !== 2) {
+          continue;
+        }
+        const [key, val] = keyValue;
         if (key && val) {
           obj[key] = parseValue(val);
         }
@@ -189,7 +187,7 @@ function parseValue(value: string): unknown {
   if (value.startsWith("[") && value.endsWith("]")) {
     try {
       const arrStr = value.slice(1, -1);
-      return arrStr.split(",").map((s) => parseValue(s.trim()));
+      return splitTopLevel(arrStr, ",").map((s) => parseValue(s.trim()));
     } catch {
       return value;
     }

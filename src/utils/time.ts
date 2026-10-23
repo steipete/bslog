@@ -27,6 +27,15 @@ export function parseTimeString(timeStr: string): Date {
     throw new Error(`Unknown time unit: ${unit}`);
   }
 
+  const clickHouse = timeStr.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/);
+  if (clickHouse) {
+    const date = new Date(`${timeStr.replace(" ", "T")}Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid time format: ${timeStr}`);
+    }
+    return date;
+  }
+
   // Try to parse as ISO date or other standard formats
   const date = new Date(timeStr);
   if (Number.isNaN(date.getTime())) {

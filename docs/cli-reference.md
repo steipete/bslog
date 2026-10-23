@@ -90,7 +90,7 @@ Select `*` for the raw payload or list fields separated by commas. Field names s
 | Date                     | `2026-08-02`            |
 | Runtime-parsed timestamp | `2026-08-02 12:00:00`   |
 
-Relative values are calculated from the current time. Absolute values are parsed by the JavaScript `Date` runtime and converted to UTC for ClickHouse.
+Relative values are calculated from the current time. ClickHouse-style timestamps (`YYYY-MM-DD HH:mm:ss`, optionally with fractional seconds) and ISO timestamps without a timezone are interpreted as UTC. Other absolute values are parsed by the JavaScript `Date` runtime and converted to UTC for ClickHouse.
 
 ## Output
 

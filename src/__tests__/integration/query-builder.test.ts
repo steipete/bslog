@@ -41,9 +41,11 @@ mock.module("../../utils/config", () => ({
 }));
 
 // Mock the client
+let lastSql = "";
 mock.module("../../api/client", () => ({
   BetterStackClient: class {
-    query(_sql: string) {
+    query(sql: string) {
+      lastSql = sql;
       return Promise.resolve([{ dt: "2024-01-15", level: "info", message: "test" }]);
     }
   },
@@ -59,6 +61,20 @@ describe("Query Builder Integration", () => {
   beforeEach(() => {
     queryAPI = new QueryAPI();
     mockConfig.defaultLogLevel = "all";
+  });
+
+  it("adds JSON output to raw SQL with format functions and trailing comments", async () => {
+    const sql = "SELECT formatDateTime(dt, '%F') FROM logs; -- format JSONEachRow";
+    await queryAPI.executeSql(sql);
+    expect(lastSql).toBe(
+      "SELECT formatDateTime(dt, '%F') FROM logs -- format JSONEachRow\nFORMAT JSONEachRow",
+    );
+  });
+
+  it("preserves an explicit raw SQL output format", async () => {
+    const sql = "SELECT 1 FORMAT JSONEachRow; -- trailing comment";
+    await queryAPI.executeSql(sql);
+    expect(lastSql).toBe(sql);
   });
 
   describe("buildQuery", () => {

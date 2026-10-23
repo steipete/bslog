@@ -56,6 +56,19 @@ describe("Time Utilities", () => {
       expect(() => parseTimeString("5x")).toThrow("Unknown time unit: x");
     });
 
+    it("parses a ClickHouse timestamp as UTC", () => {
+      const parsed = parseTimeString("2024-01-15 10:30:45.123");
+      expect(parsed.toISOString()).toBe("2024-01-15T10:30:45.123Z");
+      expect(toClickHouseDateTime(parsed)).toBe("2024-01-15 10:30:45");
+      expect(parseTimeString("2024-01-15 10:30:45.123456").toISOString()).toBe(
+        "2024-01-15T10:30:45.123Z",
+      );
+      expect(parseTimeString("2024-01-15 10:30:45.123456789").toISOString()).toBe(
+        "2024-01-15T10:30:45.123Z",
+      );
+      expect(() => parseTimeString("2024-01-15 30:30:45")).toThrow("Invalid time format");
+    });
+
     it("should throw on invalid date format", () => {
       expect(() => parseTimeString("invalid-date")).toThrow("Invalid time format: invalid-date");
     });

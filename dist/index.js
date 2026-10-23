@@ -4784,6 +4784,14 @@ function parseTimeString(timeStr) {
     const unit = timeStr.match(/[a-z]$/i)?.[0];
     throw new Error(`Unknown time unit: ${unit}`);
   }
+  const clickHouse = timeStr.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/);
+  if (clickHouse) {
+    const date = new Date(`${timeStr.replace(" ", "T")}Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid time format: ${timeStr}`);
+    }
+    return date;
+  }
   const date = new Date(timeStr);
   if (Number.isNaN(date.getTime())) {
     throw new Error(`Invalid time format: ${timeStr}`);
@@ -5226,12 +5234,23 @@ class QueryAPI {
   }
   executeSql(sql) {
     let statement = sql;
-    if (!statement.toLowerCase().includes("format")) {
-      statement = `${statement} FORMAT JSONEachRow`;
+    if (!hasOutputFormat(statement)) {
+      const lastCodeIndex = maskSql(statement).trimEnd().length - 1;
+      if (statement[lastCodeIndex] === ";") {
+        statement = statement.slice(0, lastCodeIndex) + statement.slice(lastCodeIndex + 1);
+      }
+      statement = `${statement}
+FORMAT JSONEachRow`;
     }
     const { username, password } = getQueryCredentials();
     return this.client.query(statement, username, password);
   }
+}
+function hasOutputFormat(statement) {
+  return /\bformat\s+(?!as\b|from\b)[a-z][a-z0-9_]*(?:\s+settings\b[\s\S]*)?\s*;?\s*$/i.test(maskSql(statement));
+}
+function maskSql(statement) {
+  return statement.replace(/'(?:\\.|''|[^'\\])*'|"(?:\\.|""|[^"\\])*"|`(?:\\.|``|[^`\\])*`|--[^\r\n]*|#[^\r\n]*|\/\*[\s\S]*?\*\//g, (text) => text.replace(/[^\r\n]/g, " "));
 }
 
 // src/parser/graphql.ts
@@ -5291,43 +5310,11 @@ function parseGraphQLQuery(query) {
 }
 function parseArguments(argsStr) {
   const result = {};
-  let currentKey = "";
-  let currentValue = "";
-  let depth = 0;
-  let inString = false;
-  let stringChar = "";
-  for (let i = 0;i < argsStr.length; i++) {
-    const char = argsStr[i];
-    if (inString) {
-      if (char === stringChar && argsStr[i - 1] !== "\\") {
-        inString = false;
-      }
-      currentValue += char;
-    } else if (char === '"' || char === "'") {
-      inString = true;
-      stringChar = char;
-      currentValue += char;
-    } else if (char === "{" || char === "[") {
-      depth++;
-      currentValue += char;
-    } else if (char === "}" || char === "]") {
-      depth--;
-      currentValue += char;
-    } else if (char === ":" && depth === 0 && !currentKey) {
-      currentKey = currentValue.trim();
-      currentValue = "";
-    } else if (char === "," && depth === 0) {
-      if (currentKey) {
-        result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
-        currentKey = "";
-        currentValue = "";
-      }
-    } else {
-      currentValue += char;
+  for (const argument of splitTopLevel(argsStr, ",")) {
+    const [key, value] = splitTopLevel(argument, ":", 2).map((part) => part.trim());
+    if (key && value) {
+      result[key] = parseArgumentValue(key, value);
     }
-  }
-  if (currentKey && currentValue) {
-    result[currentKey] = parseArgumentValue(currentKey, currentValue.trim());
   }
   return result;
 }
@@ -5339,6 +5326,40 @@ function parseArgumentValue(key, value) {
 }
 function parseLimitValue(value) {
   return normalizeLimitValue(parseQuotedString(value) ?? value);
+}
+function splitTopLevel(input, separator, maxParts = Infinity) {
+  const parts = [];
+  let start = 0;
+  let quote = null;
+  let depth = 0;
+  for (let index = 0;index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "{" || char === "[") {
+      depth += 1;
+    } else if (char === "}" || char === "]") {
+      depth -= 1;
+    } else if (char === separator && depth === 0) {
+      parts.push(input.slice(start, index));
+      start = index + 1;
+      if (parts.length === maxParts - 1) {
+        break;
+      }
+    }
+  }
+  if (input.slice(start).trim()) {
+    parts.push(input.slice(start));
+  }
+  return parts;
 }
 function parseValue(value) {
   const quotedString = parseQuotedString(value);
@@ -5358,9 +5379,13 @@ function parseValue(value) {
     try {
       const objStr = value.slice(1, -1);
       const obj = {};
-      const pairs = objStr.split(",");
+      const pairs = splitTopLevel(objStr, ",");
       for (const pair of pairs) {
-        const [key, val] = pair.split(":").map((s) => s.trim());
+        const keyValue = splitTopLevel(pair, ":", 2).map((part) => part.trim());
+        if (keyValue.length !== 2) {
+          continue;
+        }
+        const [key, val] = keyValue;
         if (key && val) {
           obj[key] = parseValue(val);
         }
@@ -5373,7 +5398,7 @@ function parseValue(value) {
   if (value.startsWith("[") && value.endsWith("]")) {
     try {
       const arrStr = value.slice(1, -1);
-      return arrStr.split(",").map((s) => parseValue(s.trim()));
+      return splitTopLevel(arrStr, ",").map((s) => parseValue(s.trim()));
     } catch {
       return value;
     }

@@ -51,6 +51,16 @@ describe("GraphQL Parser", () => {
       expect(result.search).toBe("database error");
     });
 
+    it("keeps commas and colons inside quoted where values", () => {
+      const query = "{ logs(where: { message: \"a, b: c\", status: 'ok' }) { * } }";
+      const result = parseGraphQLQuery(query);
+
+      expect(result.where).toEqual({
+        message: "a, b: c",
+        status: "ok",
+      });
+    });
+
     it("should parse query with where clause", () => {
       const query = "{ logs(where: { userId: '12345', status: 'active' }) { * } }";
       const result = parseGraphQLQuery(query);
@@ -59,6 +69,16 @@ describe("GraphQL Parser", () => {
         userId: "12345",
         status: "active",
       });
+    });
+
+    it("keeps nested arrays and escaped quotes inside where values", () => {
+      const query = String.raw`{ logs(where: { message: "say \"hello, world\": yes", nested: { tags: ["a,b", "c:d"] } }, limit: 5) { * } }`;
+      const result = parseGraphQLQuery(query);
+      expect(result.where).toEqual({
+        message: String.raw`say \"hello, world\": yes`,
+        nested: { tags: ["a,b", "c:d"] },
+      });
+      expect(result.limit).toBe(5);
     });
 
     it("should parse signed decimal and exponent where values as numbers", () => {
