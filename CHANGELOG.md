@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.6.1] - Unreleased
+## [Unreleased]
+
+## [1.7.0] - 2026-10-23
+
+**Highlights:** Format SQL-function results as JSON while preserving UTC follow timestamps and structured query filters.
 
 - Keep ClickHouse timestamps in UTC during follow polling, including fractional seconds. Thanks @SebTardif.
 - Preserve quoted delimiters and nested values in structured query filters. Thanks @SebTardif.
