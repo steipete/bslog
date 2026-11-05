@@ -4784,6 +4784,14 @@ function parseTimeString(timeStr) {
     const unit = timeStr.match(/[a-z]$/i)?.[0];
     throw new Error(`Unknown time unit: ${unit}`);
   }
+  const minutePrecision = timeStr.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})$/);
+  if (minutePrecision) {
+    const date = new Date(`${minutePrecision[1]}T${minutePrecision[2]}:00Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid time format: ${timeStr}`);
+    }
+    return date;
+  }
   const clickHouse = timeStr.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/);
   if (clickHouse) {
     const date = new Date(`${timeStr.replace(" ", "T")}Z`);
@@ -5008,6 +5016,9 @@ var VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function escapeSqlString(value) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
+function escapeLikePattern(value) {
+  return escapeSqlString(value).replace(/[%_]/g, (char) => `\\${char}`);
+}
 
 class QueryAPI {
   client;
@@ -5171,7 +5182,7 @@ class QueryAPI {
       conditions.push(`${subsystemAccessor} = '${escapeSqlString(options.subsystem)}'`);
     }
     if (options.search) {
-      conditions.push(`raw LIKE '%${escapeSqlString(options.search)}%'`);
+      conditions.push(`raw LIKE '%${escapeLikePattern(options.search)}%' ESCAPE '\\'`);
     }
     if (options.where) {
       for (const [key, value] of Object.entries(options.where)) {
@@ -5260,11 +5271,11 @@ function parseGraphQLQuery(query) {
   if (normalizedQuery.startsWith("{") && normalizedQuery.endsWith("}")) {
     normalizedQuery = normalizedQuery.slice(1, -1).trim();
   }
-  const logsMatch = normalizedQuery.match(/logs\s*\((.*?)\)\s*\{(.*?)\}/s);
+  const logsMatch = matchLogsQuery(normalizedQuery);
   if (!logsMatch) {
     throw new Error("Invalid query format. Expected: { logs(...) { ... } }");
   }
-  const [, argsStr = "", fieldsStr = ""] = logsMatch;
+  const { args: argsStr, fields: fieldsStr } = logsMatch;
   const options = {};
   if (argsStr) {
     const args = parseArguments(argsStr);
@@ -5301,12 +5312,100 @@ function parseGraphQLQuery(query) {
     }
   }
   if (fieldsStr) {
-    const fields = fieldsStr.split(",").map((f) => f.trim()).filter((f) => f.length > 0);
+    const fields = splitTopLevel(fieldsStr, ",").map((field) => field.trim()).map((field) => parseQuotedString(field) ?? field).filter((field) => field.length > 0);
     if (fields.length > 0 && fields[0] !== "*") {
       options.fields = fields;
     }
   }
   return options;
+}
+function matchLogsQuery(source) {
+  const start = source.search(/\blogs\s*\(/);
+  if (start < 0) {
+    return null;
+  }
+  const openParen = source.indexOf("(", start);
+  const closeParen = indexOfMatchingParen(source, openParen);
+  if (closeParen < 0) {
+    return null;
+  }
+  let cursor = closeParen + 1;
+  while (cursor < source.length && /\s/.test(source[cursor] ?? "")) {
+    cursor += 1;
+  }
+  if (source[cursor] !== "{") {
+    return null;
+  }
+  const closeBrace = indexOfMatchingBrace(source, cursor);
+  if (closeBrace < 0) {
+    return null;
+  }
+  return {
+    args: source.slice(openParen + 1, closeParen),
+    fields: source.slice(cursor + 1, closeBrace)
+  };
+}
+function indexOfMatchingParen(input, openIndex) {
+  let quote = null;
+  let paren = 0;
+  let brace = 0;
+  let bracket = 0;
+  for (let index = openIndex;index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      paren += 1;
+    } else if (char === ")") {
+      paren -= 1;
+      if (paren === 0 && brace === 0 && bracket === 0) {
+        return index;
+      }
+    } else if (char === "{") {
+      brace += 1;
+    } else if (char === "}") {
+      brace = Math.max(0, brace - 1);
+    } else if (char === "[") {
+      bracket += 1;
+    } else if (char === "]") {
+      bracket = Math.max(0, bracket - 1);
+    }
+  }
+  return -1;
+}
+function indexOfMatchingBrace(input, openIndex) {
+  let quote = null;
+  let depth = 0;
+  for (let index = openIndex;index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+  return -1;
 }
 function parseArguments(argsStr) {
   const result = {};
