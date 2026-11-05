@@ -211,13 +211,23 @@ describe("Query Builder Integration", () => {
       expect(sql).toContain("WHERE raw LIKE '%user''s data%'");
     });
 
-    it("escapes LIKE wildcards in the search pattern", async () => {
+    it("does not put a backslash before the closing quote of a timeout search", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        search: "timeout",
+      });
+
+      expect(sql).not.toContain("\\'");
+    });
+
+    it("keeps percent and underscore as LIKE patterns", async () => {
       const sql = await queryAPI.buildQuery({
         source: "test-source",
         search: "100%_done",
       });
 
-      expect(sql).toContain("raw LIKE '%100\\%\\_done%' ESCAPE '\\'");
+      expect(sql).toContain("raw LIKE '%100%_done%'");
+      expect(sql).not.toContain("ESCAPE");
     });
 
     it("should build query with time range", async () => {
@@ -258,7 +268,7 @@ describe("Query Builder Integration", () => {
         "SELECT dt, JSON_VALUE(raw, '$.message') AS \"message\" FROM (SELECT dt, raw FROM remote",
       );
       expect(sql).toContain(
-        ") WHERE raw LIKE '%timeout%' ESCAPE '\\' ORDER BY dt DESC LIMIT 25 FORMAT JSONEachRow",
+        ") WHERE raw LIKE '%timeout%' ORDER BY dt DESC LIMIT 25 FORMAT JSONEachRow",
       );
     });
 

@@ -5016,9 +5016,6 @@ var VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function escapeSqlString(value) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
-function escapeLikePattern(value) {
-  return escapeSqlString(value).replace(/[%_]/g, (char) => `\\${char}`);
-}
 
 class QueryAPI {
   client;
@@ -5182,7 +5179,7 @@ class QueryAPI {
       conditions.push(`${subsystemAccessor} = '${escapeSqlString(options.subsystem)}'`);
     }
     if (options.search) {
-      conditions.push(`raw LIKE '%${escapeLikePattern(options.search)}%' ESCAPE '\\'`);
+      conditions.push(`raw LIKE '%${escapeSqlString(options.search)}%'`);
     }
     if (options.where) {
       for (const [key, value] of Object.entries(options.where)) {
