@@ -27,6 +27,15 @@ export function parseTimeString(timeStr: string): Date {
     throw new Error(`Unknown time unit: ${unit}`);
   }
 
+  const minutePrecision = timeStr.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})$/);
+  if (minutePrecision) {
+    const date = new Date(`${minutePrecision[1]}T${minutePrecision[2]}:00Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid time format: ${timeStr}`);
+    }
+    return date;
+  }
+
   const clickHouse = timeStr.match(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/);
   if (clickHouse) {
     const date = new Date(`${timeStr.replace(" ", "T")}Z`);

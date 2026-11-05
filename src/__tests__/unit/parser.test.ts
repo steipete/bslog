@@ -198,6 +198,19 @@ describe("GraphQL Parser", () => {
       expect(() => parseGraphQLQuery(query)).toThrow("Invalid query format");
     });
 
+    it("keeps a closing sequence that appears inside a quoted argument", () => {
+      const result = parseGraphQLQuery(`{ logs(where: { message: ") {" }) { dt } }`);
+
+      expect(result.where).toEqual({ message: ") {" });
+      expect(result.fields).toEqual(["dt"]);
+    });
+
+    it("does not split a quoted field name on a comma", () => {
+      const result = parseGraphQLQuery(`{ logs() { "a,b", dt } }`);
+
+      expect(result.fields).toEqual(["a,b", "dt"]);
+    });
+
     // Skip nested braces test - parser doesn't support deep nesting yet
     it.skip("should handle query with nested braces in where clause", () => {
       const query = "{ logs(where: { nested: { field: 'value' } }) { dt } }";

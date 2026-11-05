@@ -10,13 +10,12 @@ export function parseGraphQLQuery(query: string): QueryOptions {
     normalizedQuery = normalizedQuery.slice(1, -1).trim();
   }
 
-  // Match the logs query pattern
-  const logsMatch = normalizedQuery.match(/logs\s*\((.*?)\)\s*\{(.*?)\}/s);
+  const logsMatch = matchLogsQuery(normalizedQuery);
   if (!logsMatch) {
     throw new Error("Invalid query format. Expected: { logs(...) { ... } }");
   }
 
-  const [, argsStr = "", fieldsStr = ""] = logsMatch;
+  const { args: argsStr, fields: fieldsStr } = logsMatch;
 
   // Parse arguments
   const options: QueryOptions = {};
@@ -68,16 +67,107 @@ export function parseGraphQLQuery(query: string): QueryOptions {
 
   // Parse fields
   if (fieldsStr) {
-    const fields = fieldsStr
-      .split(",")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
+    const fields = splitTopLevel(fieldsStr, ",")
+      .map((field) => field.trim())
+      .map((field) => parseQuotedString(field) ?? field)
+      .filter((field) => field.length > 0);
     if (fields.length > 0 && fields[0] !== "*") {
       options.fields = fields;
     }
   }
 
   return options;
+}
+
+function matchLogsQuery(source: string): { args: string; fields: string } | null {
+  const start = source.search(/\blogs\s*\(/);
+  if (start < 0) {
+    return null;
+  }
+  const openParen = source.indexOf("(", start);
+  const closeParen = indexOfMatchingParen(source, openParen);
+  if (closeParen < 0) {
+    return null;
+  }
+  let cursor = closeParen + 1;
+  while (cursor < source.length && /\s/.test(source[cursor] ?? "")) {
+    cursor += 1;
+  }
+  if (source[cursor] !== "{") {
+    return null;
+  }
+  const closeBrace = indexOfMatchingBrace(source, cursor);
+  if (closeBrace < 0) {
+    return null;
+  }
+  return {
+    args: source.slice(openParen + 1, closeParen),
+    fields: source.slice(cursor + 1, closeBrace),
+  };
+}
+
+function indexOfMatchingParen(input: string, openIndex: number): number {
+  let quote: string | null = null;
+  let paren = 0;
+  let brace = 0;
+  let bracket = 0;
+  for (let index = openIndex; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "(") {
+      paren += 1;
+    } else if (char === ")") {
+      paren -= 1;
+      if (paren === 0 && brace === 0 && bracket === 0) {
+        return index;
+      }
+    } else if (char === "{") {
+      brace += 1;
+    } else if (char === "}") {
+      brace = Math.max(0, brace - 1);
+    } else if (char === "[") {
+      bracket += 1;
+    } else if (char === "]") {
+      bracket = Math.max(0, bracket - 1);
+    }
+  }
+  return -1;
+}
+
+function indexOfMatchingBrace(input: string, openIndex: number): number {
+  let quote: string | null = null;
+  let depth = 0;
+  for (let index = openIndex; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+  return -1;
 }
 
 function parseArguments(argsStr: string): Record<string, unknown> {

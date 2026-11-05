@@ -11,6 +11,10 @@ function escapeSqlString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
 
+function escapeLikePattern(value: string): string {
+  return escapeSqlString(value).replace(/[%_]/g, (char) => `\\${char}`);
+}
+
 export class QueryAPI {
   private client: BetterStackClient;
   private sourcesAPI: SourcesAPI;
@@ -231,7 +235,7 @@ export class QueryAPI {
     }
 
     if (options.search) {
-      conditions.push(`raw LIKE '%${escapeSqlString(options.search)}%'`);
+      conditions.push(`raw LIKE '%${escapeLikePattern(options.search)}%' ESCAPE '\\'`);
     }
 
     if (options.where) {

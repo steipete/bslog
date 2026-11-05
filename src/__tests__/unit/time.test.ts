@@ -72,6 +72,18 @@ describe("Time Utilities", () => {
     it("should throw on invalid date format", () => {
       expect(() => parseTimeString("invalid-date")).toThrow("Invalid time format: invalid-date");
     });
+
+    it("parses a timestamp without seconds as UTC", () => {
+      const child = Bun.spawnSync({
+        cmd: [
+          process.execPath,
+          "-e",
+          "import { parseTimeString } from './src/utils/time.ts'; const got = parseTimeString('2024-01-02T03:04').getTime(); if (got !== Date.UTC(2024, 0, 2, 3, 4, 0)) process.exit(1);",
+        ],
+        env: { ...process.env, TZ: "America/Los_Angeles" },
+      });
+      expect(child.exitCode).toBe(0);
+    });
   });
 
   describe("formatDateTime", () => {
