@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { formatDateTime, parseTimeString, toClickHouseDateTime } from "../../utils/time";
+import {
+  clickHouseDateTime64,
+  formatDateTime,
+  parseTimeString,
+  toClickHouseDateTime,
+} from "../../utils/time";
 
 describe("Time Utilities", () => {
   describe("parseTimeString", () => {
@@ -103,6 +108,33 @@ describe("Time Utilities", () => {
       const result = toClickHouseDateTime(date);
 
       expect(result).toBe("2024-01-15 10:30:45");
+    });
+  });
+
+  describe("clickHouseDateTime64", () => {
+    it("keeps a server timestamp fraction", () => {
+      expect(clickHouseDateTime64("2026-08-11 08:03:22.984072")).toEqual({
+        value: "2026-08-11 08:03:22.984072",
+        scale: 6,
+      });
+    });
+
+    it("shifts an offset timestamp without dropping the fraction", () => {
+      expect(clickHouseDateTime64("2026-08-11T03:03:22.984072-05:00")).toEqual({
+        value: "2026-08-11 08:03:22.984072",
+        scale: 6,
+      });
+    });
+
+    it("keeps whole-second bounds at scale 3", () => {
+      expect(clickHouseDateTime64("2024-01-02T00:00:00Z")).toEqual({
+        value: "2024-01-02 00:00:00",
+        scale: 3,
+      });
+    });
+
+    it("rejects an impossible fractional clock time", () => {
+      expect(() => clickHouseDateTime64("2024-01-15 30:30:45.123")).toThrow("Invalid time format");
     });
   });
 });

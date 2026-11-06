@@ -4802,6 +4802,55 @@ function toClickHouseDateTime(date) {
   const iso = date.toISOString();
   return iso.slice(0, 19).replace("T", " ");
 }
+function clickHouseDateTime64(timeStr) {
+  const preserved = preserveFractionalTimestamp(timeStr);
+  if (preserved) {
+    return preserved;
+  }
+  return { value: toClickHouseDateTime(parseTimeString(timeStr)), scale: 3 };
+}
+function preserveFractionalTimestamp(timeStr) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(\.\d{1,9})(Z|[+-]\d{2}:\d{2})?$/.exec(timeStr);
+  if (!match) {
+    return;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const fraction = match[7] ?? "";
+  const zone = match[8];
+  if (!isValidClock(year, month, day, hour, minute, second)) {
+    return;
+  }
+  let offsetMinutes = 0;
+  if (zone && zone !== "Z") {
+    const sign = zone.startsWith("-") ? -1 : 1;
+    const zoneHour = Number(zone.slice(1, 3));
+    const zoneMinute = Number(zone.slice(4, 6));
+    if (zoneHour > 23 || zoneMinute > 59) {
+      return;
+    }
+    offsetMinutes = sign * (zoneHour * 60 + zoneMinute);
+  }
+  const utc = new Date(Date.UTC(year, month - 1, day, hour, minute, second) - offsetMinutes * 60000);
+  let digits = fraction.slice(1);
+  if (digits.length < 3) {
+    digits = digits.padEnd(3, "0");
+  }
+  const pad = (value) => String(value).padStart(2, "0");
+  const value = `${utc.getUTCFullYear()}-${pad(utc.getUTCMonth() + 1)}-${pad(utc.getUTCDate())} ` + `${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}:${pad(utc.getUTCSeconds())}.${digits}`;
+  return { value, scale: digits.length };
+}
+function isValidClock(year, month, day, hour, minute, second) {
+  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59 || second > 59) {
+    return false;
+  }
+  const probe = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day && probe.getUTCHours() === hour && probe.getUTCMinutes() === minute && probe.getUTCSeconds() === second;
+}
 
 // src/api/client.ts
 var TELEMETRY_BASE_URL = "https://telemetry.betterstack.com/api/v1";
@@ -5008,6 +5057,16 @@ var VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function escapeSqlString(value) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
 }
+function timeBound(operator, timeStr) {
+  const bound = clickHouseDateTime64(timeStr);
+  return `dt ${operator} toDateTime64('${bound.value}', ${bound.scale})`;
+}
+function sqlOffset(value) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    return 0;
+  }
+  return value;
+}
 
 class QueryAPI {
   client;
@@ -5144,12 +5203,10 @@ class QueryAPI {
     const fields = options.fields && options.fields.length > 0 ? this.buildFieldSelection(options.fields) : "dt, raw";
     const timeConditions = [];
     if (options.since) {
-      const sinceDate = parseTimeString(options.since);
-      timeConditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
+      timeConditions.push(timeBound(">=", options.since));
     }
     if (options.until) {
-      const untilDate = parseTimeString(options.until);
-      timeConditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
+      timeConditions.push(timeBound("<=", options.until));
     }
     const conditions = [];
     if (effectiveLevel) {
@@ -5205,6 +5262,10 @@ class QueryAPI {
     }
     sql += " ORDER BY dt DESC";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
+    const offset = sqlOffset(options.offset);
+    if (offset > 0) {
+      sql += ` OFFSET ${offset}`;
+    }
     sql += " FORMAT JSONEachRow";
     return sql;
   }
@@ -5874,19 +5935,14 @@ Following logs... (Press Ctrl+C to stop)`));
     try {
       const window = await fetchFollowWindow(api, {
         ...options,
-        since: cursor.dt || sinceFallback
-      }, pollLimit);
+        since: cursor.dt || sinceFallback,
+        until: cursor.resumeUntil ?? options.until
+      }, pollLimit, cursor.resumeSkip ?? 0);
       const unseen = selectUnseen(window.rows, cursor);
       if (unseen.length > 0) {
         printResults(unseen, outputFormat, runtime.jq);
       }
-      if (!window.complete || window.rows.length === 0) {
-        if (!window.complete && unseen.length > 0) {
-          rememberPrinted(cursor, unseen);
-        }
-        return;
-      }
-      adoptCompletePage(cursor, window.rows);
+      applyFollowWindow(cursor, window, unseen);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
@@ -5902,21 +5958,26 @@ async function runMultiSource(api, baseOptions, runtime, sources) {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
     const rowsBySource = new Map;
-    const completeBySource = new Map;
+    const windows = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
         source,
         limit: limitPerSource
       };
+      const cursor = cursors.get(source);
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
-      const window = drain ? await fetchFollowWindow(api, perSourceOptions, limitPerSource) : {
+      if (cursor?.resumeUntil) {
+        perSourceOptions.until = cursor.resumeUntil;
+      }
+      const window = drain ? await fetchFollowWindow(api, perSourceOptions, limitPerSource, cursor?.resumeSkip ?? 0) : {
         rows: await api.execute(perSourceOptions),
-        complete: true
+        complete: true,
+        resumeSkip: 0
       };
       rowsBySource.set(source, window.rows);
-      completeBySource.set(source, window.complete);
+      windows.set(source, window);
       for (const entry of window.rows) {
         combined.push({ ...entry, source });
       }
@@ -5925,7 +5986,7 @@ async function runMultiSource(api, baseOptions, runtime, sources) {
     return {
       combined: drain ? combined : combined.slice(0, limitPerSource),
       rowsBySource,
-      completeBySource
+      windows
     };
   };
   const { combined: initialCombined, rowsBySource } = await collect();
@@ -5968,11 +6029,11 @@ Following logs... (Press Ctrl+C to stop)`));
           sinceMap.set(source, cursor.dt);
         }
       }
-      const { rowsBySource: followRows, completeBySource } = await collect(sinceMap, pollLimit, fallbackSince, true);
+      const { windows: followWindows } = await collect(sinceMap, pollLimit, fallbackSince, true);
       const fresh = [];
       const unseenBySource = new Map;
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
+        const page = followWindows.get(source)?.rows ?? [];
         const unseen = selectUnseen(page, cursors.get(source) ?? emptyFollowCursor());
         unseenBySource.set(source, unseen);
         for (const entry of unseen) {
@@ -5984,17 +6045,12 @@ Following logs... (Press Ctrl+C to stop)`));
         printResults(fresh, outputFormat, runtime.jq);
       }
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
-        if (page.length === 0) {
+        const window = followWindows.get(source);
+        if (!window || window.rows.length === 0 && window.complete) {
           continue;
         }
         const cursor = cursors.get(source) ?? emptyFollowCursor();
-        if (completeBySource.get(source) !== true) {
-          rememberPrinted(cursor, unseenBySource.get(source) ?? []);
-          cursors.set(source, cursor);
-          continue;
-        }
-        adoptCompletePage(cursor, page);
+        applyFollowWindow(cursor, window, unseenBySource.get(source) ?? []);
         cursors.set(source, cursor);
       }
     } catch (error) {
@@ -6005,7 +6061,7 @@ Following logs... (Press Ctrl+C to stop)`));
   process.stdin.resume();
 }
 function emptyFollowCursor() {
-  return { dt: null, seen: new Map, holdAll: false };
+  return { dt: null, seen: new Map, holdAll: false, resumeSkip: 0 };
 }
 function compareNewestFirst(left, right) {
   if (left.dt === right.dt) {
@@ -6069,10 +6125,73 @@ function rememberPrinted(cursor, entries) {
   }
 }
 function adoptCompletePage(cursor, entries) {
-  const newest = entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+  const newest = maxDt(entries);
   cursor.dt = newest;
   cursor.seen = countKeys(entries, newest);
   cursor.holdAll = false;
+  clearFollowResume(cursor);
+}
+function maxDt(entries) {
+  return entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+}
+function clearFollowResume(cursor) {
+  cursor.resumeUntil = undefined;
+  cursor.resumeSkip = 0;
+  cursor.pendingDt = undefined;
+  cursor.pendingSeen = undefined;
+}
+function notePendingHighWater(cursor, windowRows, printed) {
+  if (windowRows.length === 0) {
+    return;
+  }
+  const newest = maxDt(windowRows);
+  if (!cursor.pendingDt || newest > cursor.pendingDt) {
+    const seen = countKeys(printed, newest);
+    if (cursor.dt === newest) {
+      for (const [key, count] of cursor.seen) {
+        seen.set(key, (seen.get(key) ?? 0) + count);
+      }
+    }
+    cursor.pendingDt = newest;
+    cursor.pendingSeen = seen;
+    return;
+  }
+  if (newest !== cursor.pendingDt || !cursor.pendingSeen) {
+    return;
+  }
+  for (const [key, count] of countKeys(printed, newest)) {
+    cursor.pendingSeen.set(key, (cursor.pendingSeen.get(key) ?? 0) + count);
+  }
+}
+function commitPendingHighWater(cursor) {
+  if (!cursor.pendingDt || !cursor.pendingSeen) {
+    clearFollowResume(cursor);
+    return;
+  }
+  cursor.dt = cursor.pendingDt;
+  cursor.seen = cursor.pendingSeen;
+  cursor.holdAll = false;
+  clearFollowResume(cursor);
+}
+function applyFollowWindow(cursor, window, unseen) {
+  if (!window.complete) {
+    notePendingHighWater(cursor, window.rows, unseen);
+    rememberPrinted(cursor, unseen);
+    if (window.resumeUntil) {
+      cursor.resumeUntil = window.resumeUntil;
+    }
+    cursor.resumeSkip = window.resumeSkip;
+    return;
+  }
+  if (cursor.pendingDt) {
+    notePendingHighWater(cursor, window.rows, unseen);
+    commitPendingHighWater(cursor);
+    return;
+  }
+  if (window.rows.length === 0) {
+    return;
+  }
+  adoptCompletePage(cursor, window.rows);
 }
 function mergeNewRows(existing, page) {
   const counts = countKeys(existing);
@@ -6088,20 +6207,22 @@ function mergeNewRows(existing, page) {
   }
   return merged;
 }
-async function fetchFollowWindow(api, options, pollLimit) {
+var MAX_FOLLOW_HOPS = 20;
+async function fetchFollowWindow(api, options, pollLimit, resumeSkip = 0) {
   let rows = [];
   let until = options.until;
+  let skip = resumeSkip;
   let complete = false;
-  for (let hop = 0;hop < 20; hop += 1) {
-    let limit = pollLimit;
-    let page = await api.execute({ ...options, until, limit });
+  for (let hop = 0;hop < MAX_FOLLOW_HOPS; hop += 1) {
+    let limit = Math.max(1, pollLimit);
+    let page = await api.execute(followPageOptions(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
       const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
       if (nextLimit === limit) {
         break;
       }
       limit = nextLimit;
-      page = await api.execute({ ...options, until, limit });
+      page = await api.execute(followPageOptions(options, until, limit, skip));
     }
     if (page.length === 0) {
       complete = true;
@@ -6113,13 +6234,29 @@ async function fetchFollowWindow(api, options, pollLimit) {
       break;
     }
     const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
-    if (until === oldest) {
-      break;
+    const sameBucket = page.every((entry) => entry.dt === oldest);
+    if (sameBucket || until === oldest) {
+      until = oldest;
+      skip += page.length;
+      continue;
     }
     until = oldest;
+    skip = 0;
   }
   rows.sort(compareNewestFirst);
-  return { rows, complete };
+  if (complete || !until) {
+    return { rows, complete, resumeSkip: 0 };
+  }
+  return { rows, complete: false, resumeUntil: until, resumeSkip: skip };
+}
+function followPageOptions(options, until, limit, skip) {
+  const next = { ...options, until, limit };
+  if (skip > 0) {
+    next.offset = skip;
+  } else {
+    delete next.offset;
+  }
+  return next;
 }
 function resolveFormat(format, jqFilter) {
   if (jqFilter) {
@@ -6304,19 +6441,14 @@ Following logs... (Press Ctrl+C to stop)`));
     try {
       const window = await fetchFollowWindow2(api, {
         ...options,
-        since: cursor.dt || sinceFallback
-      }, pollLimit);
+        since: cursor.dt || sinceFallback,
+        until: cursor.resumeUntil ?? options.until
+      }, pollLimit, cursor.resumeSkip ?? 0);
       const unseen = selectUnseen2(window.rows, cursor);
       if (unseen.length > 0) {
         printResults2(unseen, outputFormat, runtime.jq);
       }
-      if (!window.complete || window.rows.length === 0) {
-        if (!window.complete && unseen.length > 0) {
-          rememberPrinted2(cursor, unseen);
-        }
-        return;
-      }
-      adoptCompletePage2(cursor, window.rows);
+      applyFollowWindow2(cursor, window, unseen);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
@@ -6332,21 +6464,26 @@ async function runMultiSource2(api, baseOptions, runtime, sources) {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
     const rowsBySource = new Map;
-    const completeBySource = new Map;
+    const windows = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
         source,
         limit: limitPerSource
       };
+      const cursor = cursors.get(source);
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
-      const window = drain ? await fetchFollowWindow2(api, perSourceOptions, limitPerSource) : {
+      if (cursor?.resumeUntil) {
+        perSourceOptions.until = cursor.resumeUntil;
+      }
+      const window = drain ? await fetchFollowWindow2(api, perSourceOptions, limitPerSource, cursor?.resumeSkip ?? 0) : {
         rows: await api.execute(perSourceOptions),
-        complete: true
+        complete: true,
+        resumeSkip: 0
       };
       rowsBySource.set(source, window.rows);
-      completeBySource.set(source, window.complete);
+      windows.set(source, window);
       for (const entry of window.rows) {
         combined.push({ ...entry, source });
       }
@@ -6355,7 +6492,7 @@ async function runMultiSource2(api, baseOptions, runtime, sources) {
     return {
       combined: drain ? combined : combined.slice(0, limitPerSource),
       rowsBySource,
-      completeBySource
+      windows
     };
   };
   const { combined: initialCombined, rowsBySource } = await collect();
@@ -6398,11 +6535,11 @@ Following logs... (Press Ctrl+C to stop)`));
           sinceMap.set(source, cursor.dt);
         }
       }
-      const { rowsBySource: followRows, completeBySource } = await collect(sinceMap, pollLimit, fallbackSince, true);
+      const { windows: followWindows } = await collect(sinceMap, pollLimit, fallbackSince, true);
       const fresh = [];
       const unseenBySource = new Map;
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
+        const page = followWindows.get(source)?.rows ?? [];
         const unseen = selectUnseen2(page, cursors.get(source) ?? emptyFollowCursor2());
         unseenBySource.set(source, unseen);
         for (const entry of unseen) {
@@ -6414,17 +6551,12 @@ Following logs... (Press Ctrl+C to stop)`));
         printResults2(fresh, outputFormat, runtime.jq);
       }
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
-        if (page.length === 0) {
+        const window = followWindows.get(source);
+        if (!window || window.rows.length === 0 && window.complete) {
           continue;
         }
         const cursor = cursors.get(source) ?? emptyFollowCursor2();
-        if (completeBySource.get(source) !== true) {
-          rememberPrinted2(cursor, unseenBySource.get(source) ?? []);
-          cursors.set(source, cursor);
-          continue;
-        }
-        adoptCompletePage2(cursor, page);
+        applyFollowWindow2(cursor, window, unseenBySource.get(source) ?? []);
         cursors.set(source, cursor);
       }
     } catch (error) {
@@ -6435,7 +6567,7 @@ Following logs... (Press Ctrl+C to stop)`));
   process.stdin.resume();
 }
 function emptyFollowCursor2() {
-  return { dt: null, seen: new Map, holdAll: false };
+  return { dt: null, seen: new Map, holdAll: false, resumeSkip: 0 };
 }
 function compareNewestFirst2(left, right) {
   if (left.dt === right.dt) {
@@ -6499,10 +6631,73 @@ function rememberPrinted2(cursor, entries) {
   }
 }
 function adoptCompletePage2(cursor, entries) {
-  const newest = entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+  const newest = maxDt2(entries);
   cursor.dt = newest;
   cursor.seen = countKeys2(entries, newest);
   cursor.holdAll = false;
+  clearFollowResume2(cursor);
+}
+function maxDt2(entries) {
+  return entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+}
+function clearFollowResume2(cursor) {
+  cursor.resumeUntil = undefined;
+  cursor.resumeSkip = 0;
+  cursor.pendingDt = undefined;
+  cursor.pendingSeen = undefined;
+}
+function notePendingHighWater2(cursor, windowRows, printed) {
+  if (windowRows.length === 0) {
+    return;
+  }
+  const newest = maxDt2(windowRows);
+  if (!cursor.pendingDt || newest > cursor.pendingDt) {
+    const seen = countKeys2(printed, newest);
+    if (cursor.dt === newest) {
+      for (const [key, count] of cursor.seen) {
+        seen.set(key, (seen.get(key) ?? 0) + count);
+      }
+    }
+    cursor.pendingDt = newest;
+    cursor.pendingSeen = seen;
+    return;
+  }
+  if (newest !== cursor.pendingDt || !cursor.pendingSeen) {
+    return;
+  }
+  for (const [key, count] of countKeys2(printed, newest)) {
+    cursor.pendingSeen.set(key, (cursor.pendingSeen.get(key) ?? 0) + count);
+  }
+}
+function commitPendingHighWater2(cursor) {
+  if (!cursor.pendingDt || !cursor.pendingSeen) {
+    clearFollowResume2(cursor);
+    return;
+  }
+  cursor.dt = cursor.pendingDt;
+  cursor.seen = cursor.pendingSeen;
+  cursor.holdAll = false;
+  clearFollowResume2(cursor);
+}
+function applyFollowWindow2(cursor, window, unseen) {
+  if (!window.complete) {
+    notePendingHighWater2(cursor, window.rows, unseen);
+    rememberPrinted2(cursor, unseen);
+    if (window.resumeUntil) {
+      cursor.resumeUntil = window.resumeUntil;
+    }
+    cursor.resumeSkip = window.resumeSkip;
+    return;
+  }
+  if (cursor.pendingDt) {
+    notePendingHighWater2(cursor, window.rows, unseen);
+    commitPendingHighWater2(cursor);
+    return;
+  }
+  if (window.rows.length === 0) {
+    return;
+  }
+  adoptCompletePage2(cursor, window.rows);
 }
 function mergeNewRows2(existing, page) {
   const counts = countKeys2(existing);
@@ -6518,20 +6713,22 @@ function mergeNewRows2(existing, page) {
   }
   return merged;
 }
-async function fetchFollowWindow2(api, options, pollLimit) {
+var MAX_FOLLOW_HOPS2 = 20;
+async function fetchFollowWindow2(api, options, pollLimit, resumeSkip = 0) {
   let rows = [];
   let until = options.until;
+  let skip = resumeSkip;
   let complete = false;
-  for (let hop = 0;hop < 20; hop += 1) {
-    let limit = pollLimit;
-    let page = await api.execute({ ...options, until, limit });
+  for (let hop = 0;hop < MAX_FOLLOW_HOPS2; hop += 1) {
+    let limit = Math.max(1, pollLimit);
+    let page = await api.execute(followPageOptions2(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
       const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
       if (nextLimit === limit) {
         break;
       }
       limit = nextLimit;
-      page = await api.execute({ ...options, until, limit });
+      page = await api.execute(followPageOptions2(options, until, limit, skip));
     }
     if (page.length === 0) {
       complete = true;
@@ -6543,13 +6740,29 @@ async function fetchFollowWindow2(api, options, pollLimit) {
       break;
     }
     const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
-    if (until === oldest) {
-      break;
+    const sameBucket = page.every((entry) => entry.dt === oldest);
+    if (sameBucket || until === oldest) {
+      until = oldest;
+      skip += page.length;
+      continue;
     }
     until = oldest;
+    skip = 0;
   }
   rows.sort(compareNewestFirst2);
-  return { rows, complete };
+  if (complete || !until) {
+    return { rows, complete, resumeSkip: 0 };
+  }
+  return { rows, complete: false, resumeUntil: until, resumeSkip: skip };
+}
+function followPageOptions2(options, until, limit, skip) {
+  const next = { ...options, until, limit };
+  if (skip > 0) {
+    next.offset = skip;
+  } else {
+    delete next.offset;
+  }
+  return next;
 }
 function resolveFormat2(format, jqFilter) {
   if (jqFilter) {

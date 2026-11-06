@@ -1,7 +1,7 @@
 import type { LogEntry, QueryOptions } from "../types";
 import { getQueryCredentials, loadConfig, resolveSourceAlias } from "../utils/config";
 import { resolveQueryLimit } from "../utils/limits";
-import { parseTimeString, toClickHouseDateTime } from "../utils/time";
+import { clickHouseDateTime64 } from "../utils/time";
 import { BetterStackClient } from "./client";
 import { SourcesAPI } from "./sources";
 
@@ -9,6 +9,18 @@ const VALID_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function escapeSqlString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "''");
+}
+
+function timeBound(operator: ">=" | "<=", timeStr: string): string {
+  const bound = clickHouseDateTime64(timeStr);
+  return `dt ${operator} toDateTime64('${bound.value}', ${bound.scale})`;
+}
+
+function sqlOffset(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    return 0;
+  }
+  return value;
 }
 
 export class QueryAPI {
@@ -188,13 +200,11 @@ export class QueryAPI {
     const timeConditions: string[] = [];
 
     if (options.since) {
-      const sinceDate = parseTimeString(options.since);
-      timeConditions.push(`dt >= toDateTime64('${toClickHouseDateTime(sinceDate)}', 3)`);
+      timeConditions.push(timeBound(">=", options.since));
     }
 
     if (options.until) {
-      const untilDate = parseTimeString(options.until);
-      timeConditions.push(`dt <= toDateTime64('${toClickHouseDateTime(untilDate)}', 3)`);
+      timeConditions.push(timeBound("<=", options.until));
     }
 
     // Keep non-time filters outside the storage union so both tiers expose the same rows.
@@ -273,6 +283,10 @@ export class QueryAPI {
     // Add ORDER BY and LIMIT
     sql += " ORDER BY dt DESC";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
+    const offset = sqlOffset(options.offset);
+    if (offset > 0) {
+      sql += ` OFFSET ${offset}`;
+    }
     sql += " FORMAT JSONEachRow";
 
     return sql;

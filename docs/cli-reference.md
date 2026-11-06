@@ -103,7 +103,7 @@ Relative values are calculated from the current time. ClickHouse-style timestamp
 
 When `--jq` is present, bslog selects JSON automatically. If `jq` is unavailable or exits unsuccessfully, bslog reports the error and prints the unfiltered JSON.
 
-Multiple-source commands query each source, merge rows in descending `dt` order, add a `source` field, and apply the requested overall limit. Follow mode polls each source independently and does not move a source cursor past a row the poll did not print.
+Multiple-source commands query each source, merge rows in descending `dt` order, add a `source` field, and apply the requested overall limit. Follow mode polls each source independently and does not move a source cursor past a row the poll did not print. A burst that takes more than one page resumes on the next poll, and sub-second timestamps stay in the page bound.
 
 ## Configuration
 

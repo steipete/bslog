@@ -139,20 +139,16 @@ async function runSingleSource(
         {
           ...options,
           since: cursor.dt || sinceFallback,
+          until: cursor.resumeUntil ?? options.until,
         },
         pollLimit,
+        cursor.resumeSkip ?? 0,
       );
       const unseen = selectUnseen(window.rows, cursor);
       if (unseen.length > 0) {
         printResults(unseen, outputFormat, runtime.jq);
       }
-      if (!window.complete || window.rows.length === 0) {
-        if (!window.complete && unseen.length > 0) {
-          rememberPrinted(cursor, unseen);
-        }
-        return;
-      }
-      adoptCompletePage(cursor, window.rows);
+      applyFollowWindow(cursor, window, unseen);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Polling error: ${message}`));
@@ -180,12 +176,12 @@ async function runMultiSource(
   ): Promise<{
     combined: LogEntryWithSource[];
     rowsBySource: Map<string, LogEntry[]>;
-    completeBySource: Map<string, boolean>;
+    windows: Map<string, FollowWindow>;
   }> => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined: LogEntryWithSource[] = [];
     const rowsBySource = new Map<string, LogEntry[]>();
-    const completeBySource = new Map<string, boolean>();
+    const windows = new Map<string, FollowWindow>();
 
     for (const source of sources) {
       const perSourceOptions: QueryOptions = {
@@ -194,17 +190,22 @@ async function runMultiSource(
         limit: limitPerSource,
       };
 
+      const cursor = cursors.get(source);
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
+      if (cursor?.resumeUntil) {
+        perSourceOptions.until = cursor.resumeUntil;
+      }
 
       const window = drain
-        ? await fetchFollowWindow(api, perSourceOptions, limitPerSource)
+        ? await fetchFollowWindow(api, perSourceOptions, limitPerSource, cursor?.resumeSkip ?? 0)
         : {
             rows: await api.execute(perSourceOptions),
             complete: true,
+            resumeSkip: 0,
           };
       rowsBySource.set(source, window.rows);
-      completeBySource.set(source, window.complete);
+      windows.set(source, window);
       for (const entry of window.rows) {
         combined.push({ ...entry, source });
       }
@@ -215,7 +216,7 @@ async function runMultiSource(
     return {
       combined: drain ? combined : combined.slice(0, limitPerSource),
       rowsBySource,
-      completeBySource,
+      windows,
     };
   };
 
@@ -262,17 +263,12 @@ async function runMultiSource(
           sinceMap.set(source, cursor.dt);
         }
       }
-      const { rowsBySource: followRows, completeBySource } = await collect(
-        sinceMap,
-        pollLimit,
-        fallbackSince,
-        true,
-      );
+      const { windows: followWindows } = await collect(sinceMap, pollLimit, fallbackSince, true);
 
       const fresh: LogEntryWithSource[] = [];
       const unseenBySource = new Map<string, LogEntry[]>();
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
+        const page = followWindows.get(source)?.rows ?? [];
         const unseen = selectUnseen(page, cursors.get(source) ?? emptyFollowCursor());
         unseenBySource.set(source, unseen);
         for (const entry of unseen) {
@@ -285,17 +281,12 @@ async function runMultiSource(
       }
 
       for (const source of sources) {
-        const page = followRows.get(source) ?? [];
-        if (page.length === 0) {
+        const window = followWindows.get(source);
+        if (!window || (window.rows.length === 0 && window.complete)) {
           continue;
         }
         const cursor = cursors.get(source) ?? emptyFollowCursor();
-        if (completeBySource.get(source) !== true) {
-          rememberPrinted(cursor, unseenBySource.get(source) ?? []);
-          cursors.set(source, cursor);
-          continue;
-        }
-        adoptCompletePage(cursor, page);
+        applyFollowWindow(cursor, window, unseenBySource.get(source) ?? []);
         cursors.set(source, cursor);
       }
     } catch (error: unknown) {
@@ -311,10 +302,21 @@ type FollowCursor = {
   dt: string | null;
   seen: Map<string, number>;
   holdAll: boolean;
+  resumeUntil?: string;
+  resumeSkip?: number;
+  pendingDt?: string;
+  pendingSeen?: Map<string, number>;
+};
+
+type FollowWindow = {
+  rows: LogEntry[];
+  complete: boolean;
+  resumeUntil?: string;
+  resumeSkip: number;
 };
 
 function emptyFollowCursor(): FollowCursor {
-  return { dt: null, seen: new Map(), holdAll: false };
+  return { dt: null, seen: new Map(), holdAll: false, resumeSkip: 0 };
 }
 
 function compareNewestFirst(left: LogEntry, right: LogEntry): number {
@@ -388,10 +390,85 @@ function rememberPrinted(cursor: FollowCursor, entries: LogEntry[]): void {
 }
 
 function adoptCompletePage(cursor: FollowCursor, entries: LogEntry[]): void {
-  const newest = entries.reduce((max, entry) => (entry.dt > max ? entry.dt : max), entries[0].dt);
+  const newest = maxDt(entries);
   cursor.dt = newest;
   cursor.seen = countKeys(entries, newest);
   cursor.holdAll = false;
+  clearFollowResume(cursor);
+}
+
+function maxDt(entries: LogEntry[]): string {
+  return entries.reduce((max, entry) => (entry.dt > max ? entry.dt : max), entries[0].dt);
+}
+
+function clearFollowResume(cursor: FollowCursor): void {
+  cursor.resumeUntil = undefined;
+  cursor.resumeSkip = 0;
+  cursor.pendingDt = undefined;
+  cursor.pendingSeen = undefined;
+}
+
+function notePendingHighWater(
+  cursor: FollowCursor,
+  windowRows: LogEntry[],
+  printed: LogEntry[],
+): void {
+  if (windowRows.length === 0) {
+    return;
+  }
+  const newest = maxDt(windowRows);
+  if (!cursor.pendingDt || newest > cursor.pendingDt) {
+    const seen = countKeys(printed, newest);
+    if (cursor.dt === newest) {
+      for (const [key, count] of cursor.seen) {
+        seen.set(key, (seen.get(key) ?? 0) + count);
+      }
+    }
+    cursor.pendingDt = newest;
+    cursor.pendingSeen = seen;
+    return;
+  }
+  if (newest !== cursor.pendingDt || !cursor.pendingSeen) {
+    return;
+  }
+  for (const [key, count] of countKeys(printed, newest)) {
+    cursor.pendingSeen.set(key, (cursor.pendingSeen.get(key) ?? 0) + count);
+  }
+}
+
+function commitPendingHighWater(cursor: FollowCursor): void {
+  if (!cursor.pendingDt || !cursor.pendingSeen) {
+    clearFollowResume(cursor);
+    return;
+  }
+  cursor.dt = cursor.pendingDt;
+  cursor.seen = cursor.pendingSeen;
+  cursor.holdAll = false;
+  clearFollowResume(cursor);
+}
+
+function applyFollowWindow(cursor: FollowCursor, window: FollowWindow, unseen: LogEntry[]): void {
+  if (!window.complete) {
+    notePendingHighWater(cursor, window.rows, unseen);
+    rememberPrinted(cursor, unseen);
+    if (window.resumeUntil) {
+      cursor.resumeUntil = window.resumeUntil;
+    }
+    cursor.resumeSkip = window.resumeSkip;
+    return;
+  }
+
+  if (cursor.pendingDt) {
+    notePendingHighWater(cursor, window.rows, unseen);
+    commitPendingHighWater(cursor);
+    return;
+  }
+
+  if (window.rows.length === 0) {
+    return;
+  }
+
+  adoptCompletePage(cursor, window.rows);
 }
 
 function mergeNewRows(existing: LogEntry[], page: LogEntry[]): LogEntry[] {
@@ -409,26 +486,32 @@ function mergeNewRows(existing: LogEntry[], page: LogEntry[]): LogEntry[] {
   return merged;
 }
 
-// A newest-first page that fills the limit can hide older rows still inside since.
+const MAX_FOLLOW_HOPS = 20;
+
+// Newest-first LIMIT hides older rows inside since. The bound keeps the
+// server timestamp's fraction; a full bucket continues with OFFSET. An
+// unfinished hop returns that bound so the next poll does not restart.
 async function fetchFollowWindow(
   api: QueryAPI,
   options: QueryOptions,
   pollLimit: number,
-): Promise<{ rows: LogEntry[]; complete: boolean }> {
+  resumeSkip = 0,
+): Promise<FollowWindow> {
   let rows: LogEntry[] = [];
   let until = options.until;
+  let skip = resumeSkip;
   let complete = false;
 
-  for (let hop = 0; hop < 20; hop += 1) {
-    let limit = pollLimit;
-    let page = await api.execute({ ...options, until, limit });
+  for (let hop = 0; hop < MAX_FOLLOW_HOPS; hop += 1) {
+    let limit = Math.max(1, pollLimit);
+    let page = await api.execute(followPageOptions(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
       const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
       if (nextLimit === limit) {
         break;
       }
       limit = nextLimit;
-      page = await api.execute({ ...options, until, limit });
+      page = await api.execute(followPageOptions(options, until, limit, skip));
     }
 
     if (page.length === 0) {
@@ -443,14 +526,36 @@ async function fetchFollowWindow(
     }
 
     const oldest = page.reduce((min, entry) => (entry.dt < min ? entry.dt : min), page[0].dt);
-    if (until === oldest) {
-      break;
+    const sameBucket = page.every((entry) => entry.dt === oldest);
+    if (sameBucket || until === oldest) {
+      until = oldest;
+      skip += page.length;
+      continue;
     }
     until = oldest;
+    skip = 0;
   }
 
   rows.sort(compareNewestFirst);
-  return { rows, complete };
+  if (complete || !until) {
+    return { rows, complete, resumeSkip: 0 };
+  }
+  return { rows, complete: false, resumeUntil: until, resumeSkip: skip };
+}
+
+function followPageOptions(
+  options: QueryOptions,
+  until: string | undefined,
+  limit: number,
+  skip: number,
+): QueryOptions {
+  const next: QueryOptions = { ...options, until, limit };
+  if (skip > 0) {
+    next.offset = skip;
+  } else {
+    delete next.offset;
+  }
+  return next;
 }
 
 function resolveFormat(format: string | undefined, jqFilter?: string): OutputFormat {

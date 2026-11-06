@@ -23,6 +23,7 @@ export interface LogEntry {
 
 export interface QueryOptions {
   limit?: number;
+  offset?: number;
   level?: string;
   subsystem?: string;
   since?: string;

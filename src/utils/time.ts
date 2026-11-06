@@ -54,3 +54,83 @@ export function toClickHouseDateTime(date: Date): string {
   const iso = date.toISOString(); // Always UTC
   return iso.slice(0, 19).replace("T", " ");
 }
+
+// Date drops digits past milliseconds, and toClickHouseDateTime drops the rest.
+// Pagination bounds are server timestamps, so the SQL literal keeps the original fraction.
+export function clickHouseDateTime64(timeStr: string): { value: string; scale: number } {
+  const preserved = preserveFractionalTimestamp(timeStr);
+  if (preserved) {
+    return preserved;
+  }
+  return { value: toClickHouseDateTime(parseTimeString(timeStr)), scale: 3 };
+}
+
+function preserveFractionalTimestamp(
+  timeStr: string,
+): { value: string; scale: number } | undefined {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(\.\d{1,9})(Z|[+-]\d{2}:\d{2})?$/.exec(
+      timeStr,
+    );
+  if (!match) {
+    return undefined;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const fraction = match[7] ?? "";
+  const zone = match[8];
+  if (!isValidClock(year, month, day, hour, minute, second)) {
+    return undefined;
+  }
+
+  let offsetMinutes = 0;
+  if (zone && zone !== "Z") {
+    const sign = zone.startsWith("-") ? -1 : 1;
+    const zoneHour = Number(zone.slice(1, 3));
+    const zoneMinute = Number(zone.slice(4, 6));
+    if (zoneHour > 23 || zoneMinute > 59) {
+      return undefined;
+    }
+    offsetMinutes = sign * (zoneHour * 60 + zoneMinute);
+  }
+
+  const utc = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second) - offsetMinutes * 60_000,
+  );
+  let digits = fraction.slice(1);
+  if (digits.length < 3) {
+    digits = digits.padEnd(3, "0");
+  }
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  const value =
+    `${utc.getUTCFullYear()}-${pad(utc.getUTCMonth() + 1)}-${pad(utc.getUTCDate())} ` +
+    `${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}:${pad(utc.getUTCSeconds())}.${digits}`;
+  return { value, scale: digits.length };
+}
+
+function isValidClock(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
+  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59 || second > 59) {
+    return false;
+  }
+  const probe = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day &&
+    probe.getUTCHours() === hour &&
+    probe.getUTCMinutes() === minute &&
+    probe.getUTCSeconds() === second
+  );
+}

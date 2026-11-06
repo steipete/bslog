@@ -272,4 +272,130 @@ describe("tailLogs follow cursor", () => {
 
     expect(printedMessages(logSpy)).toEqual(["from-a", "from-b"]);
   });
+
+  it("pages through a full timestamp bucket before stopping", async () => {
+    const baseline = "2025-09-24 12:00:00.000000";
+    const shared = "2025-09-24 12:00:05.000000";
+    const total = 10001;
+
+    executeMock.mockImplementation((options: Record<string, unknown>) => {
+      const since = typeof options.since === "string" ? options.since : undefined;
+      const until = typeof options.until === "string" ? options.until : undefined;
+      const limit = typeof options.limit === "number" ? options.limit : total;
+      const offset = typeof options.offset === "number" ? options.offset : 0;
+      if (!since) {
+        return Promise.resolve([{ dt: baseline, raw: "{}", message: "baseline" }]);
+      }
+      if (until !== undefined && until < shared) {
+        return Promise.resolve([]);
+      }
+      const page: LogEntry[] = [];
+      for (let index = offset; index < total && page.length < limit; index += 1) {
+        page.push({ dt: shared, raw: `{"i":${index}}`, message: `tie-${index}` });
+      }
+      return Promise.resolve(page);
+    });
+
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    await tailLogs({ source: "source-a", follow: true, format: "json" });
+    await poll?.();
+
+    const counts = messageCounts(logSpy);
+    expect(counts.get("baseline")).toBe(1);
+    expect(counts.get("tie-0")).toBe(1);
+    expect(counts.get("tie-10000")).toBe(1);
+    expect(counts.size).toBe(total + 1);
+
+    await poll?.();
+
+    const after = messageCounts(logSpy);
+    expect(after.get("tie-0")).toBe(1);
+    expect(after.get("tie-10000")).toBe(1);
+    expect(after.size).toBe(total + 1);
+  }, 20_000);
+
+  it("resumes a follow backlog after the hop budget is exhausted", async () => {
+    const baseline = "2025-01-01 00:00:00.000000";
+    const baseEpoch = Date.parse("2025-09-24T12:00:00Z") / 1000;
+    const total = 210_000;
+
+    const burstDt = (index: number): string => {
+      const iso = new Date((baseEpoch - index) * 1000).toISOString();
+      return `${iso.slice(0, 19).replace("T", " ")}.000000`;
+    };
+
+    const indexForDt = (dt: string): number => {
+      const epoch = Date.parse(`${dt.slice(0, 19).replace(" ", "T")}Z`) / 1000;
+      return baseEpoch - epoch;
+    };
+
+    executeMock.mockImplementation((options: Record<string, unknown>) => {
+      const since = typeof options.since === "string" ? options.since : undefined;
+      const until = typeof options.until === "string" ? options.until : undefined;
+      const limit = typeof options.limit === "number" ? options.limit : 100;
+      const offset = typeof options.offset === "number" ? options.offset : 0;
+      if (!since) {
+        return Promise.resolve([{ dt: baseline, raw: "{}", message: "baseline" }]);
+      }
+      let start = 0;
+      if (until !== undefined) {
+        const untilIndex = indexForDt(until);
+        if (untilIndex >= total) {
+          return Promise.resolve([]);
+        }
+        start = Math.max(0, untilIndex);
+      }
+      start += offset;
+      const page: LogEntry[] = [];
+      for (let index = start; index < total && page.length < limit; index += 1) {
+        const dt = burstDt(index);
+        if (dt < since) {
+          break;
+        }
+        page.push({ dt, raw: "{}", message: `row-${index}` });
+      }
+      return Promise.resolve(page);
+    });
+
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    await tailLogs({ source: "source-a", follow: true, format: "json" });
+    await poll?.();
+
+    const afterFirst = messageCounts(logSpy);
+    expect(afterFirst.get("row-0")).toBe(1);
+    expect(afterFirst.has("row-209999")).toBe(false);
+    const callsAfterFirst = calls.length;
+
+    await poll?.();
+
+    const resumed = calls[callsAfterFirst];
+    expect(typeof resumed?.until).toBe("string");
+    expect(String(resumed?.until) < burstDt(0)).toBe(true);
+    expect(String(resumed?.until) > burstDt(total - 1)).toBe(true);
+
+    await poll?.();
+
+    const afterResume = messageCounts(logSpy);
+    expect(afterResume.get("row-0")).toBe(1);
+    expect(afterResume.get("row-209999")).toBe(1);
+    expect(afterResume.get("baseline")).toBe(1);
+  }, 60_000);
 });
+
+function messageCounts(logSpy: LogSpy): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const message of printedMessages(logSpy)) {
+    counts.set(message, (counts.get(message) ?? 0) + 1);
+  }
+  return counts;
+}

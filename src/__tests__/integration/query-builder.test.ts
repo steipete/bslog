@@ -220,6 +220,44 @@ describe("Query Builder Integration", () => {
 
       expect(sql).toContain("WHERE dt >= toDateTime64");
       expect(sql).toContain("AND dt <= toDateTime64");
+      expect(sql).toContain("dt >= toDateTime64('2024-01-01 00:00:00', 3)");
+      expect(sql).toContain("dt <= toDateTime64('2024-01-02 00:00:00', 3)");
+    });
+
+    it("keeps a fractional pagination bound in the ClickHouse comparison", async () => {
+      const stamp = "2026-08-11 08:03:22.984072";
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        since: stamp,
+        until: stamp,
+      });
+
+      expect(sql).toContain(`dt >= toDateTime64('${stamp}', 6)`);
+      expect(sql).toContain(`dt <= toDateTime64('${stamp}', 6)`);
+      expect(sql).not.toContain("toDateTime64('2026-08-11 08:03:22',");
+      expect(sql).not.toContain("08:03:22.984'");
+    });
+
+    it("pages a follow timestamp bucket with a numeric offset", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        limit: 10000,
+        offset: 10000,
+      });
+
+      expect(sql).toContain("LIMIT 10000 OFFSET 10000");
+      expect(sql.indexOf("OFFSET")).toBeLessThan(sql.indexOf("FORMAT"));
+
+      const ignored = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        limit: 10,
+        offset: Number.NaN,
+      });
+      expect(ignored).toContain("LIMIT 10");
+      expect(ignored).not.toContain("OFFSET");
     });
 
     it("should push time bounds into both storage branches", async () => {

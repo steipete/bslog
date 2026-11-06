@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Follow mode reads past a full poll page, including a later row that shares the newest timestamp, before it advances the cursor. Multi-source follow no longer treats a row dropped from the merged page as already shown.
+- Follow mode reads past a full poll page, including a later row that shares the newest timestamp, before it advances the cursor. Page bounds keep sub-second digits, a full timestamp keeps paging, and a burst that exceeds one poll resumes on the next poll. Multi-source follow no longer treats a row dropped from the merged page as already shown.
 
 ## [1.7.0] - 2026-10-23
 
