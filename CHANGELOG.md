@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Escape apostrophes in JSON field paths so a key such as `user's id` stays inside the ClickHouse string.
+
 ## [1.7.0] - 2026-10-23
 
 **Highlights:** Format SQL-function results as JSON while preserving UTC follow timestamps and structured query filters.

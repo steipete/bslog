@@ -5089,7 +5089,7 @@ class QueryAPI {
     return path;
   }
   buildJsonAccessor(field) {
-    const path = this.buildJsonPath(field);
+    const path = this.buildJsonPath(field).replace(/'/g, "''");
     return `JSON_VALUE(raw, '${path}')`;
   }
   normalizePlainSegment(segment) {

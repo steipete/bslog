@@ -107,7 +107,7 @@ export class QueryAPI {
   }
 
   private buildJsonAccessor(field: string): string {
-    const path = this.buildJsonPath(field);
+    const path = this.buildJsonPath(field).replace(/'/g, "''");
     return `JSON_VALUE(raw, '${path}')`;
   }
 

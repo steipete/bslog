@@ -105,6 +105,16 @@ describe("Query Builder Integration", () => {
       );
     });
 
+    it("escapes an apostrophe inside a JSON field path", async () => {
+      const sql = await queryAPI.buildQuery({
+        source: "test-source",
+        fields: ['metadata["user\'s id"]'],
+      });
+
+      expect(sql).toContain(`JSON_VALUE(raw, '$.metadata["user''s id"]')`);
+      expect(sql).not.toContain(`JSON_VALUE(raw, '$.metadata["user's id"]')`);
+    });
+
     it("should build query with nested field selection", async () => {
       const sql = await queryAPI.buildQuery({
         source: "test-source",
