@@ -5856,11 +5856,11 @@ async function tailLogs(options) {
 }
 async function runSingleSource(api, options, runtime) {
   const outputFormat = resolveFormat(runtime.format, runtime.jq);
-  let lastTimestamp = null;
+  const cursor = emptyFollowCursor();
   const results = await api.execute(options);
   if (results.length > 0) {
     printResults(results, outputFormat, runtime.jq);
-    lastTimestamp = results[0].dt;
+    adoptCompletePage(cursor, results);
   }
   if (!runtime.follow) {
     return;
@@ -5872,22 +5872,21 @@ Following logs... (Press Ctrl+C to stop)`));
   const sinceFallback = options.since ?? "1m";
   setInterval(async () => {
     try {
-      const pollOptions = {
+      const window = await fetchFollowWindow(api, {
         ...options,
-        limit: pollLimit,
-        since: lastTimestamp || sinceFallback
-      };
-      const newResults = await api.execute(pollOptions);
-      if (newResults.length === 0) {
+        since: cursor.dt || sinceFallback
+      }, pollLimit);
+      const unseen = selectUnseen(window.rows, cursor);
+      if (unseen.length > 0) {
+        printResults(unseen, outputFormat, runtime.jq);
+      }
+      if (!window.complete || window.rows.length === 0) {
+        if (!window.complete && unseen.length > 0) {
+          rememberPrinted(cursor, unseen);
+        }
         return;
       }
-      const previousTimestamp = lastTimestamp;
-      const filtered = previousTimestamp ? newResults.filter((entry) => entry.dt > previousTimestamp) : newResults;
-      if (filtered.length === 0) {
-        return;
-      }
-      printResults(filtered, outputFormat, runtime.jq);
-      lastTimestamp = filtered[0].dt;
+      adoptCompletePage(cursor, window.rows);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
@@ -5898,11 +5897,12 @@ Following logs... (Press Ctrl+C to stop)`));
 async function runMultiSource(api, baseOptions, runtime, sources) {
   const outputFormat = resolveFormat(runtime.format, runtime.jq);
   const limit = baseOptions.limit ?? 100;
-  const perSourceLatest = new Map;
-  const collect = async (sinceMap, limitOverride, fallbackSince) => {
+  const cursors = new Map;
+  const collect = async (sinceMap, limitOverride, fallbackSince, drain = false) => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
-    const latestBySource = new Map;
+    const rowsBySource = new Map;
+    const completeBySource = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
@@ -5911,34 +5911,49 @@ async function runMultiSource(api, baseOptions, runtime, sources) {
       };
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
-      const result = await api.execute(perSourceOptions);
-      if (result.length > 0) {
-        latestBySource.set(source, result[0].dt);
-        for (const entry of result) {
-          combined.push({ ...entry, source });
-        }
+      const window = drain ? await fetchFollowWindow(api, perSourceOptions, limitPerSource) : {
+        rows: await api.execute(perSourceOptions),
+        complete: true
+      };
+      rowsBySource.set(source, window.rows);
+      completeBySource.set(source, window.complete);
+      for (const entry of window.rows) {
+        combined.push({ ...entry, source });
       }
     }
-    combined.sort((a, b) => {
-      if (a.dt === b.dt) {
-        return 0;
-      }
-      return a.dt < b.dt ? 1 : -1;
-    });
+    combined.sort(compareNewestFirst);
     return {
-      combined: combined.slice(0, limitPerSource),
-      latestBySource
+      combined: drain ? combined : combined.slice(0, limitPerSource),
+      rowsBySource,
+      completeBySource
     };
   };
-  const { combined: initialCombined, latestBySource } = await collect();
-  for (const [source, dt] of latestBySource) {
-    perSourceLatest.set(source, dt);
-  }
+  const { combined: initialCombined, rowsBySource } = await collect();
   if (initialCombined.length > 0) {
     printResults(initialCombined, outputFormat, runtime.jq);
   }
   if (!runtime.follow) {
     return;
+  }
+  for (const source of sources) {
+    const fetched = rowsBySource.get(source) ?? [];
+    const printed = initialCombined.filter((entry) => entry.source === source);
+    if (fetched.length === 0) {
+      continue;
+    }
+    const missing = entriesNotCovered(fetched, printed);
+    if (missing.length === 0) {
+      const cursor = emptyFollowCursor();
+      adoptCompletePage(cursor, fetched);
+      cursors.set(source, cursor);
+      continue;
+    }
+    const oldest = missing.reduce((min, entry) => entry.dt < min ? entry.dt : min, missing[0].dt);
+    cursors.set(source, {
+      dt: oldest,
+      seen: countKeys(printed),
+      holdAll: true
+    });
   }
   console.error(source_default2.gray(`
 Following logs... (Press Ctrl+C to stop)`));
@@ -5947,21 +5962,40 @@ Following logs... (Press Ctrl+C to stop)`));
   const fallbackSince = baseOptions.since ? undefined : "1m";
   setInterval(async () => {
     try {
-      const { combined, latestBySource: followLatest } = await collect(perSourceLatest, pollLimit, fallbackSince);
-      if (combined.length > 0) {
-        const newEntries = combined.filter((entry) => {
-          const previous = perSourceLatest.get(entry.source);
-          return !previous || entry.dt > previous;
-        });
-        if (newEntries.length > 0) {
-          printResults(newEntries, outputFormat, runtime.jq);
+      const sinceMap = new Map;
+      for (const [source, cursor] of cursors) {
+        if (cursor.dt) {
+          sinceMap.set(source, cursor.dt);
         }
       }
-      for (const [source, dt] of followLatest) {
-        const previous = perSourceLatest.get(source);
-        if (!previous || dt > previous) {
-          perSourceLatest.set(source, dt);
+      const { rowsBySource: followRows, completeBySource } = await collect(sinceMap, pollLimit, fallbackSince, true);
+      const fresh = [];
+      const unseenBySource = new Map;
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        const unseen = selectUnseen(page, cursors.get(source) ?? emptyFollowCursor());
+        unseenBySource.set(source, unseen);
+        for (const entry of unseen) {
+          fresh.push({ ...entry, source });
         }
+      }
+      fresh.sort(compareNewestFirst);
+      if (fresh.length > 0) {
+        printResults(fresh, outputFormat, runtime.jq);
+      }
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        if (page.length === 0) {
+          continue;
+        }
+        const cursor = cursors.get(source) ?? emptyFollowCursor();
+        if (completeBySource.get(source) !== true) {
+          rememberPrinted(cursor, unseenBySource.get(source) ?? []);
+          cursors.set(source, cursor);
+          continue;
+        }
+        adoptCompletePage(cursor, page);
+        cursors.set(source, cursor);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -5969,6 +6003,123 @@ Following logs... (Press Ctrl+C to stop)`));
     }
   }, intervalMs);
   process.stdin.resume();
+}
+function emptyFollowCursor() {
+  return { dt: null, seen: new Map, holdAll: false };
+}
+function compareNewestFirst(left, right) {
+  if (left.dt === right.dt) {
+    return 0;
+  }
+  return left.dt < right.dt ? 1 : -1;
+}
+function followKey(entry) {
+  const extras = Object.keys(entry).filter((key) => key !== "dt" && key !== "raw" && key !== "source").sort().map((key) => `${key}=${JSON.stringify(entry[key])}`);
+  return `${entry.dt}\x00${String(entry.raw)}\x00${extras.join("\x00")}`;
+}
+function countKeys(entries, dt) {
+  const counts = new Map;
+  for (const entry of entries) {
+    if (dt !== undefined && entry.dt !== dt) {
+      continue;
+    }
+    const key = followKey(entry);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+function entriesNotCovered(fetched, printed) {
+  const remaining = countKeys(printed);
+  const missing = [];
+  for (const entry of fetched) {
+    const key = followKey(entry);
+    const left = remaining.get(key) ?? 0;
+    if (left > 0) {
+      remaining.set(key, left - 1);
+      continue;
+    }
+    missing.push(entry);
+  }
+  return missing;
+}
+function selectUnseen(entries, cursor) {
+  const remaining = new Map(cursor.seen);
+  const unseen = [];
+  for (const entry of entries) {
+    const key = followKey(entry);
+    if (cursor.holdAll || cursor.dt !== null && entry.dt === cursor.dt) {
+      const left = remaining.get(key) ?? 0;
+      if (left > 0) {
+        remaining.set(key, left - 1);
+        continue;
+      }
+    }
+    if (!cursor.holdAll && cursor.dt !== null && entry.dt < cursor.dt) {
+      continue;
+    }
+    unseen.push(entry);
+  }
+  return unseen;
+}
+function rememberPrinted(cursor, entries) {
+  cursor.holdAll = true;
+  for (const entry of entries) {
+    const key = followKey(entry);
+    cursor.seen.set(key, (cursor.seen.get(key) ?? 0) + 1);
+  }
+}
+function adoptCompletePage(cursor, entries) {
+  const newest = entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+  cursor.dt = newest;
+  cursor.seen = countKeys(entries, newest);
+  cursor.holdAll = false;
+}
+function mergeNewRows(existing, page) {
+  const counts = countKeys(existing);
+  const merged = existing.slice();
+  for (const entry of page) {
+    const key = followKey(entry);
+    const left = counts.get(key) ?? 0;
+    if (left > 0) {
+      counts.set(key, left - 1);
+      continue;
+    }
+    merged.push(entry);
+  }
+  return merged;
+}
+async function fetchFollowWindow(api, options, pollLimit) {
+  let rows = [];
+  let until = options.until;
+  let complete = false;
+  for (let hop = 0;hop < 20; hop += 1) {
+    let limit = pollLimit;
+    let page = await api.execute({ ...options, until, limit });
+    while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
+      const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
+      if (nextLimit === limit) {
+        break;
+      }
+      limit = nextLimit;
+      page = await api.execute({ ...options, until, limit });
+    }
+    if (page.length === 0) {
+      complete = true;
+      break;
+    }
+    rows = mergeNewRows(rows, page);
+    if (page.length < limit) {
+      complete = true;
+      break;
+    }
+    const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
+    if (until === oldest) {
+      break;
+    }
+    until = oldest;
+  }
+  rows.sort(compareNewestFirst);
+  return { rows, complete };
 }
 function resolveFormat(format, jqFilter) {
   if (jqFilter) {
@@ -6135,11 +6286,11 @@ async function tailLogs2(options) {
 }
 async function runSingleSource2(api, options, runtime) {
   const outputFormat = resolveFormat2(runtime.format, runtime.jq);
-  let lastTimestamp = null;
+  const cursor = emptyFollowCursor2();
   const results = await api.execute(options);
   if (results.length > 0) {
     printResults2(results, outputFormat, runtime.jq);
-    lastTimestamp = results[0].dt;
+    adoptCompletePage2(cursor, results);
   }
   if (!runtime.follow) {
     return;
@@ -6151,22 +6302,21 @@ Following logs... (Press Ctrl+C to stop)`));
   const sinceFallback = options.since ?? "1m";
   setInterval(async () => {
     try {
-      const pollOptions = {
+      const window = await fetchFollowWindow2(api, {
         ...options,
-        limit: pollLimit,
-        since: lastTimestamp || sinceFallback
-      };
-      const newResults = await api.execute(pollOptions);
-      if (newResults.length === 0) {
+        since: cursor.dt || sinceFallback
+      }, pollLimit);
+      const unseen = selectUnseen2(window.rows, cursor);
+      if (unseen.length > 0) {
+        printResults2(unseen, outputFormat, runtime.jq);
+      }
+      if (!window.complete || window.rows.length === 0) {
+        if (!window.complete && unseen.length > 0) {
+          rememberPrinted2(cursor, unseen);
+        }
         return;
       }
-      const previousTimestamp = lastTimestamp;
-      const filtered = previousTimestamp ? newResults.filter((entry) => entry.dt > previousTimestamp) : newResults;
-      if (filtered.length === 0) {
-        return;
-      }
-      printResults2(filtered, outputFormat, runtime.jq);
-      lastTimestamp = filtered[0].dt;
+      adoptCompletePage2(cursor, window.rows);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
@@ -6177,11 +6327,12 @@ Following logs... (Press Ctrl+C to stop)`));
 async function runMultiSource2(api, baseOptions, runtime, sources) {
   const outputFormat = resolveFormat2(runtime.format, runtime.jq);
   const limit = baseOptions.limit ?? 100;
-  const perSourceLatest = new Map;
-  const collect = async (sinceMap, limitOverride, fallbackSince) => {
+  const cursors = new Map;
+  const collect = async (sinceMap, limitOverride, fallbackSince, drain = false) => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined = [];
-    const latestBySource = new Map;
+    const rowsBySource = new Map;
+    const completeBySource = new Map;
     for (const source of sources) {
       const perSourceOptions = {
         ...baseOptions,
@@ -6190,34 +6341,49 @@ async function runMultiSource2(api, baseOptions, runtime, sources) {
       };
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
-      const result = await api.execute(perSourceOptions);
-      if (result.length > 0) {
-        latestBySource.set(source, result[0].dt);
-        for (const entry of result) {
-          combined.push({ ...entry, source });
-        }
+      const window = drain ? await fetchFollowWindow2(api, perSourceOptions, limitPerSource) : {
+        rows: await api.execute(perSourceOptions),
+        complete: true
+      };
+      rowsBySource.set(source, window.rows);
+      completeBySource.set(source, window.complete);
+      for (const entry of window.rows) {
+        combined.push({ ...entry, source });
       }
     }
-    combined.sort((a, b) => {
-      if (a.dt === b.dt) {
-        return 0;
-      }
-      return a.dt < b.dt ? 1 : -1;
-    });
+    combined.sort(compareNewestFirst2);
     return {
-      combined: combined.slice(0, limitPerSource),
-      latestBySource
+      combined: drain ? combined : combined.slice(0, limitPerSource),
+      rowsBySource,
+      completeBySource
     };
   };
-  const { combined: initialCombined, latestBySource } = await collect();
-  for (const [source, dt] of latestBySource) {
-    perSourceLatest.set(source, dt);
-  }
+  const { combined: initialCombined, rowsBySource } = await collect();
   if (initialCombined.length > 0) {
     printResults2(initialCombined, outputFormat, runtime.jq);
   }
   if (!runtime.follow) {
     return;
+  }
+  for (const source of sources) {
+    const fetched = rowsBySource.get(source) ?? [];
+    const printed = initialCombined.filter((entry) => entry.source === source);
+    if (fetched.length === 0) {
+      continue;
+    }
+    const missing = entriesNotCovered2(fetched, printed);
+    if (missing.length === 0) {
+      const cursor = emptyFollowCursor2();
+      adoptCompletePage2(cursor, fetched);
+      cursors.set(source, cursor);
+      continue;
+    }
+    const oldest = missing.reduce((min, entry) => entry.dt < min ? entry.dt : min, missing[0].dt);
+    cursors.set(source, {
+      dt: oldest,
+      seen: countKeys2(printed),
+      holdAll: true
+    });
   }
   console.error(source_default2.gray(`
 Following logs... (Press Ctrl+C to stop)`));
@@ -6226,21 +6392,40 @@ Following logs... (Press Ctrl+C to stop)`));
   const fallbackSince = baseOptions.since ? undefined : "1m";
   setInterval(async () => {
     try {
-      const { combined, latestBySource: followLatest } = await collect(perSourceLatest, pollLimit, fallbackSince);
-      if (combined.length > 0) {
-        const newEntries = combined.filter((entry) => {
-          const previous = perSourceLatest.get(entry.source);
-          return !previous || entry.dt > previous;
-        });
-        if (newEntries.length > 0) {
-          printResults2(newEntries, outputFormat, runtime.jq);
+      const sinceMap = new Map;
+      for (const [source, cursor] of cursors) {
+        if (cursor.dt) {
+          sinceMap.set(source, cursor.dt);
         }
       }
-      for (const [source, dt] of followLatest) {
-        const previous = perSourceLatest.get(source);
-        if (!previous || dt > previous) {
-          perSourceLatest.set(source, dt);
+      const { rowsBySource: followRows, completeBySource } = await collect(sinceMap, pollLimit, fallbackSince, true);
+      const fresh = [];
+      const unseenBySource = new Map;
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        const unseen = selectUnseen2(page, cursors.get(source) ?? emptyFollowCursor2());
+        unseenBySource.set(source, unseen);
+        for (const entry of unseen) {
+          fresh.push({ ...entry, source });
         }
+      }
+      fresh.sort(compareNewestFirst2);
+      if (fresh.length > 0) {
+        printResults2(fresh, outputFormat, runtime.jq);
+      }
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        if (page.length === 0) {
+          continue;
+        }
+        const cursor = cursors.get(source) ?? emptyFollowCursor2();
+        if (completeBySource.get(source) !== true) {
+          rememberPrinted2(cursor, unseenBySource.get(source) ?? []);
+          cursors.set(source, cursor);
+          continue;
+        }
+        adoptCompletePage2(cursor, page);
+        cursors.set(source, cursor);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -6248,6 +6433,123 @@ Following logs... (Press Ctrl+C to stop)`));
     }
   }, intervalMs);
   process.stdin.resume();
+}
+function emptyFollowCursor2() {
+  return { dt: null, seen: new Map, holdAll: false };
+}
+function compareNewestFirst2(left, right) {
+  if (left.dt === right.dt) {
+    return 0;
+  }
+  return left.dt < right.dt ? 1 : -1;
+}
+function followKey2(entry) {
+  const extras = Object.keys(entry).filter((key) => key !== "dt" && key !== "raw" && key !== "source").sort().map((key) => `${key}=${JSON.stringify(entry[key])}`);
+  return `${entry.dt}\x00${String(entry.raw)}\x00${extras.join("\x00")}`;
+}
+function countKeys2(entries, dt) {
+  const counts = new Map;
+  for (const entry of entries) {
+    if (dt !== undefined && entry.dt !== dt) {
+      continue;
+    }
+    const key = followKey2(entry);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+function entriesNotCovered2(fetched, printed) {
+  const remaining = countKeys2(printed);
+  const missing = [];
+  for (const entry of fetched) {
+    const key = followKey2(entry);
+    const left = remaining.get(key) ?? 0;
+    if (left > 0) {
+      remaining.set(key, left - 1);
+      continue;
+    }
+    missing.push(entry);
+  }
+  return missing;
+}
+function selectUnseen2(entries, cursor) {
+  const remaining = new Map(cursor.seen);
+  const unseen = [];
+  for (const entry of entries) {
+    const key = followKey2(entry);
+    if (cursor.holdAll || cursor.dt !== null && entry.dt === cursor.dt) {
+      const left = remaining.get(key) ?? 0;
+      if (left > 0) {
+        remaining.set(key, left - 1);
+        continue;
+      }
+    }
+    if (!cursor.holdAll && cursor.dt !== null && entry.dt < cursor.dt) {
+      continue;
+    }
+    unseen.push(entry);
+  }
+  return unseen;
+}
+function rememberPrinted2(cursor, entries) {
+  cursor.holdAll = true;
+  for (const entry of entries) {
+    const key = followKey2(entry);
+    cursor.seen.set(key, (cursor.seen.get(key) ?? 0) + 1);
+  }
+}
+function adoptCompletePage2(cursor, entries) {
+  const newest = entries.reduce((max, entry) => entry.dt > max ? entry.dt : max, entries[0].dt);
+  cursor.dt = newest;
+  cursor.seen = countKeys2(entries, newest);
+  cursor.holdAll = false;
+}
+function mergeNewRows2(existing, page) {
+  const counts = countKeys2(existing);
+  const merged = existing.slice();
+  for (const entry of page) {
+    const key = followKey2(entry);
+    const left = counts.get(key) ?? 0;
+    if (left > 0) {
+      counts.set(key, left - 1);
+      continue;
+    }
+    merged.push(entry);
+  }
+  return merged;
+}
+async function fetchFollowWindow2(api, options, pollLimit) {
+  let rows = [];
+  let until = options.until;
+  let complete = false;
+  for (let hop = 0;hop < 20; hop += 1) {
+    let limit = pollLimit;
+    let page = await api.execute({ ...options, until, limit });
+    while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
+      const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
+      if (nextLimit === limit) {
+        break;
+      }
+      limit = nextLimit;
+      page = await api.execute({ ...options, until, limit });
+    }
+    if (page.length === 0) {
+      complete = true;
+      break;
+    }
+    rows = mergeNewRows2(rows, page);
+    if (page.length < limit) {
+      complete = true;
+      break;
+    }
+    const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
+    if (until === oldest) {
+      break;
+    }
+    until = oldest;
+  }
+  rows.sort(compareNewestFirst2);
+  return { rows, complete };
 }
 function resolveFormat2(format, jqFilter) {
   if (jqFilter) {

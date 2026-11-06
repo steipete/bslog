@@ -4,7 +4,7 @@ import { QueryAPI } from "../api/query";
 import type { LogEntry, QueryOptions } from "../types";
 import { loadConfig, resolveSourceAlias } from "../utils/config";
 import { formatOutput, type OutputFormat } from "../utils/formatter";
-import { DEFAULT_QUERY_LIMIT, normalizeLimitValue } from "../utils/limits";
+import { DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT, normalizeLimitValue } from "../utils/limits";
 
 type JqRunner = typeof spawnSync;
 let jqRunner: JqRunner = spawnSync;
@@ -114,13 +114,13 @@ async function runSingleSource(
   runtime: TailRuntimeOptions,
 ): Promise<void> {
   const outputFormat = resolveFormat(runtime.format, runtime.jq);
-  let lastTimestamp: string | null = null;
+  const cursor = emptyFollowCursor();
 
   const results = await api.execute(options);
 
   if (results.length > 0) {
     printResults(results, outputFormat, runtime.jq);
-    lastTimestamp = results[0].dt;
+    adoptCompletePage(cursor, results);
   }
 
   if (!runtime.follow) {
@@ -134,27 +134,25 @@ async function runSingleSource(
 
   setInterval(async () => {
     try {
-      const pollOptions: QueryOptions = {
-        ...options,
-        limit: pollLimit,
-        since: lastTimestamp || sinceFallback,
-      };
-
-      const newResults = await api.execute(pollOptions);
-      if (newResults.length === 0) {
+      const window = await fetchFollowWindow(
+        api,
+        {
+          ...options,
+          since: cursor.dt || sinceFallback,
+        },
+        pollLimit,
+      );
+      const unseen = selectUnseen(window.rows, cursor);
+      if (unseen.length > 0) {
+        printResults(unseen, outputFormat, runtime.jq);
+      }
+      if (!window.complete || window.rows.length === 0) {
+        if (!window.complete && unseen.length > 0) {
+          rememberPrinted(cursor, unseen);
+        }
         return;
       }
-
-      const previousTimestamp = lastTimestamp;
-      const filtered = previousTimestamp
-        ? newResults.filter((entry) => entry.dt > previousTimestamp)
-        : newResults;
-      if (filtered.length === 0) {
-        return;
-      }
-
-      printResults(filtered, outputFormat, runtime.jq);
-      lastTimestamp = filtered[0].dt;
+      adoptCompletePage(cursor, window.rows);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Polling error: ${message}`));
@@ -172,16 +170,22 @@ async function runMultiSource(
 ): Promise<void> {
   const outputFormat = resolveFormat(runtime.format, runtime.jq);
   const limit = baseOptions.limit ?? 100;
-  const perSourceLatest = new Map<string, string>();
+  const cursors = new Map<string, FollowCursor>();
 
   const collect = async (
     sinceMap?: Map<string, string>,
     limitOverride?: number,
     fallbackSince?: string,
-  ): Promise<{ combined: LogEntryWithSource[]; latestBySource: Map<string, string> }> => {
+    drain = false,
+  ): Promise<{
+    combined: LogEntryWithSource[];
+    rowsBySource: Map<string, LogEntry[]>;
+    completeBySource: Map<string, boolean>;
+  }> => {
     const limitPerSource = Math.max(1, limitOverride ?? limit);
     const combined: LogEntryWithSource[] = [];
-    const latestBySource = new Map<string, string>();
+    const rowsBySource = new Map<string, LogEntry[]>();
+    const completeBySource = new Map<string, boolean>();
 
     for (const source of sources) {
       const perSourceOptions: QueryOptions = {
@@ -193,39 +197,56 @@ async function runMultiSource(
       const sinceCandidate = sinceMap?.get(source) ?? baseOptions.since ?? fallbackSince;
       perSourceOptions.since = sinceCandidate || undefined;
 
-      const result = await api.execute(perSourceOptions);
-      if (result.length > 0) {
-        latestBySource.set(source, result[0].dt);
-        for (const entry of result) {
-          combined.push({ ...entry, source });
-        }
+      const window = drain
+        ? await fetchFollowWindow(api, perSourceOptions, limitPerSource)
+        : {
+            rows: await api.execute(perSourceOptions),
+            complete: true,
+          };
+      rowsBySource.set(source, window.rows);
+      completeBySource.set(source, window.complete);
+      for (const entry of window.rows) {
+        combined.push({ ...entry, source });
       }
     }
 
-    combined.sort((a, b) => {
-      if (a.dt === b.dt) {
-        return 0;
-      }
-      return a.dt < b.dt ? 1 : -1;
-    });
+    combined.sort(compareNewestFirst);
 
     return {
-      combined: combined.slice(0, limitPerSource),
-      latestBySource,
+      combined: drain ? combined : combined.slice(0, limitPerSource),
+      rowsBySource,
+      completeBySource,
     };
   };
 
-  const { combined: initialCombined, latestBySource } = await collect();
-  for (const [source, dt] of latestBySource) {
-    perSourceLatest.set(source, dt);
-  }
-
+  const { combined: initialCombined, rowsBySource } = await collect();
   if (initialCombined.length > 0) {
     printResults(initialCombined, outputFormat, runtime.jq);
   }
 
   if (!runtime.follow) {
     return;
+  }
+
+  for (const source of sources) {
+    const fetched = rowsBySource.get(source) ?? [];
+    const printed = initialCombined.filter((entry) => entry.source === source);
+    if (fetched.length === 0) {
+      continue;
+    }
+    const missing = entriesNotCovered(fetched, printed);
+    if (missing.length === 0) {
+      const cursor = emptyFollowCursor();
+      adoptCompletePage(cursor, fetched);
+      cursors.set(source, cursor);
+      continue;
+    }
+    const oldest = missing.reduce((min, entry) => (entry.dt < min ? entry.dt : min), missing[0].dt);
+    cursors.set(source, {
+      dt: oldest,
+      seen: countKeys(printed),
+      holdAll: true,
+    });
   }
 
   console.error(chalk.gray("\nFollowing logs... (Press Ctrl+C to stop)"));
@@ -235,28 +256,47 @@ async function runMultiSource(
 
   setInterval(async () => {
     try {
-      const { combined, latestBySource: followLatest } = await collect(
-        perSourceLatest,
-        pollLimit,
-        fallbackSince,
-      );
-
-      if (combined.length > 0) {
-        const newEntries = combined.filter((entry) => {
-          const previous = perSourceLatest.get(entry.source);
-          return !previous || entry.dt > previous;
-        });
-
-        if (newEntries.length > 0) {
-          printResults(newEntries, outputFormat, runtime.jq);
+      const sinceMap = new Map<string, string>();
+      for (const [source, cursor] of cursors) {
+        if (cursor.dt) {
+          sinceMap.set(source, cursor.dt);
         }
       }
+      const { rowsBySource: followRows, completeBySource } = await collect(
+        sinceMap,
+        pollLimit,
+        fallbackSince,
+        true,
+      );
 
-      for (const [source, dt] of followLatest) {
-        const previous = perSourceLatest.get(source);
-        if (!previous || dt > previous) {
-          perSourceLatest.set(source, dt);
+      const fresh: LogEntryWithSource[] = [];
+      const unseenBySource = new Map<string, LogEntry[]>();
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        const unseen = selectUnseen(page, cursors.get(source) ?? emptyFollowCursor());
+        unseenBySource.set(source, unseen);
+        for (const entry of unseen) {
+          fresh.push({ ...entry, source });
         }
+      }
+      fresh.sort(compareNewestFirst);
+      if (fresh.length > 0) {
+        printResults(fresh, outputFormat, runtime.jq);
+      }
+
+      for (const source of sources) {
+        const page = followRows.get(source) ?? [];
+        if (page.length === 0) {
+          continue;
+        }
+        const cursor = cursors.get(source) ?? emptyFollowCursor();
+        if (completeBySource.get(source) !== true) {
+          rememberPrinted(cursor, unseenBySource.get(source) ?? []);
+          cursors.set(source, cursor);
+          continue;
+        }
+        adoptCompletePage(cursor, page);
+        cursors.set(source, cursor);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -265,6 +305,152 @@ async function runMultiSource(
   }, intervalMs);
 
   process.stdin.resume();
+}
+
+type FollowCursor = {
+  dt: string | null;
+  seen: Map<string, number>;
+  holdAll: boolean;
+};
+
+function emptyFollowCursor(): FollowCursor {
+  return { dt: null, seen: new Map(), holdAll: false };
+}
+
+function compareNewestFirst(left: LogEntry, right: LogEntry): number {
+  if (left.dt === right.dt) {
+    return 0;
+  }
+  return left.dt < right.dt ? 1 : -1;
+}
+
+function followKey(entry: LogEntry): string {
+  const extras = Object.keys(entry)
+    .filter((key) => key !== "dt" && key !== "raw" && key !== "source")
+    .sort()
+    .map((key) => `${key}=${JSON.stringify(entry[key])}`);
+  return `${entry.dt}\u0000${String(entry.raw)}\u0000${extras.join("\u0000")}`;
+}
+
+function countKeys(entries: LogEntry[], dt?: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    if (dt !== undefined && entry.dt !== dt) {
+      continue;
+    }
+    const key = followKey(entry);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function entriesNotCovered(fetched: LogEntry[], printed: LogEntry[]): LogEntry[] {
+  const remaining = countKeys(printed);
+  const missing: LogEntry[] = [];
+  for (const entry of fetched) {
+    const key = followKey(entry);
+    const left = remaining.get(key) ?? 0;
+    if (left > 0) {
+      remaining.set(key, left - 1);
+      continue;
+    }
+    missing.push(entry);
+  }
+  return missing;
+}
+
+function selectUnseen(entries: LogEntry[], cursor: FollowCursor): LogEntry[] {
+  const remaining = new Map(cursor.seen);
+  const unseen: LogEntry[] = [];
+  for (const entry of entries) {
+    const key = followKey(entry);
+    if (cursor.holdAll || (cursor.dt !== null && entry.dt === cursor.dt)) {
+      const left = remaining.get(key) ?? 0;
+      if (left > 0) {
+        remaining.set(key, left - 1);
+        continue;
+      }
+    }
+    if (!cursor.holdAll && cursor.dt !== null && entry.dt < cursor.dt) {
+      continue;
+    }
+    unseen.push(entry);
+  }
+  return unseen;
+}
+
+function rememberPrinted(cursor: FollowCursor, entries: LogEntry[]): void {
+  cursor.holdAll = true;
+  for (const entry of entries) {
+    const key = followKey(entry);
+    cursor.seen.set(key, (cursor.seen.get(key) ?? 0) + 1);
+  }
+}
+
+function adoptCompletePage(cursor: FollowCursor, entries: LogEntry[]): void {
+  const newest = entries.reduce((max, entry) => (entry.dt > max ? entry.dt : max), entries[0].dt);
+  cursor.dt = newest;
+  cursor.seen = countKeys(entries, newest);
+  cursor.holdAll = false;
+}
+
+function mergeNewRows(existing: LogEntry[], page: LogEntry[]): LogEntry[] {
+  const counts = countKeys(existing);
+  const merged = existing.slice();
+  for (const entry of page) {
+    const key = followKey(entry);
+    const left = counts.get(key) ?? 0;
+    if (left > 0) {
+      counts.set(key, left - 1);
+      continue;
+    }
+    merged.push(entry);
+  }
+  return merged;
+}
+
+// A newest-first page that fills the limit can hide older rows still inside since.
+async function fetchFollowWindow(
+  api: QueryAPI,
+  options: QueryOptions,
+  pollLimit: number,
+): Promise<{ rows: LogEntry[]; complete: boolean }> {
+  let rows: LogEntry[] = [];
+  let until = options.until;
+  let complete = false;
+
+  for (let hop = 0; hop < 20; hop += 1) {
+    let limit = pollLimit;
+    let page = await api.execute({ ...options, until, limit });
+    while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
+      const nextLimit = Math.min(MAX_QUERY_LIMIT, limit * 2);
+      if (nextLimit === limit) {
+        break;
+      }
+      limit = nextLimit;
+      page = await api.execute({ ...options, until, limit });
+    }
+
+    if (page.length === 0) {
+      complete = true;
+      break;
+    }
+
+    rows = mergeNewRows(rows, page);
+    if (page.length < limit) {
+      complete = true;
+      break;
+    }
+
+    const oldest = page.reduce((min, entry) => (entry.dt < min ? entry.dt : min), page[0].dt);
+    if (until === oldest) {
+      break;
+    }
+    until = oldest;
+  }
+
+  rows.sort(compareNewestFirst);
+  return { rows, complete };
 }
 
 function resolveFormat(format: string | undefined, jqFilter?: string): OutputFormat {
