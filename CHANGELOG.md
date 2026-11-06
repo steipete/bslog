@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Follow mode no longer starts another poll while the previous query is still running, so a slow request does not print the same new rows twice or stack requests.
+
 ## [1.7.0] - 2026-10-23
 
 **Highlights:** Format SQL-function results as JSON while preserving UTC follow timestamps and structured query filters.

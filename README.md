@@ -85,7 +85,7 @@ bslog tail --sources api-production,worker-production --since 30m
 bslog trace req-123 --sources api-production,worker-production
 ```
 
-Follow mode polls each source independently. `trace` applies the request ID as a `requestId` structured-field filter.
+Follow mode polls each source independently and waits for the current query before starting the next one. `trace` applies the request ID as a `requestId` structured-field filter.
 
 ## Configuration
 

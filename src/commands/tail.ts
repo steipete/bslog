@@ -132,7 +132,7 @@ async function runSingleSource(
   const pollLimit = Math.max(1, Math.min(50, options.limit ?? 50));
   const sinceFallback = options.since ?? "1m";
 
-  setInterval(async () => {
+  scheduleFollowPoll(intervalMs, async () => {
     try {
       const pollOptions: QueryOptions = {
         ...options,
@@ -159,7 +159,7 @@ async function runSingleSource(
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
 
   process.stdin.resume();
 }
@@ -233,7 +233,7 @@ async function runMultiSource(
   const pollLimit = Math.max(1, Math.min(50, limit));
   const fallbackSince = baseOptions.since ? undefined : "1m";
 
-  setInterval(async () => {
+  scheduleFollowPoll(intervalMs, async () => {
     try {
       const { combined, latestBySource: followLatest } = await collect(
         perSourceLatest,
@@ -262,9 +262,24 @@ async function runMultiSource(
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
 
   process.stdin.resume();
+}
+
+function scheduleFollowPoll(intervalMs: number, poll: () => Promise<void>): void {
+  let inFlight = false;
+  setInterval(async () => {
+    if (inFlight) {
+      return;
+    }
+    inFlight = true;
+    try {
+      await poll();
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
 }
 
 function resolveFormat(format: string | undefined, jqFilter?: string): OutputFormat {
