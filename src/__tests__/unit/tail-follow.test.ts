@@ -390,6 +390,185 @@ describe("tailLogs follow cursor", () => {
     expect(afterResume.get("row-209999")).toBe(1);
     expect(afterResume.get("baseline")).toBe(1);
   }, 60_000);
+
+  it("resets the follow offset when the timestamp bound moves", async () => {
+    const baseline = "2025-09-24 12:00:00.000000";
+    const newerDt = "2025-09-24 12:00:05.000000";
+    const olderDt = "2025-09-24 12:00:04.000000";
+    const newerCount = 10_000;
+    const olderCount = 20_000;
+
+    const sequenceFor = (until: string | undefined): LogEntry[] => {
+      const rows: LogEntry[] = [];
+      const pushBucket = (dt: string, count: number, label: string) => {
+        if (until !== undefined && dt > until) {
+          return;
+        }
+        for (let index = 0; index < count; index += 1) {
+          rows.push({
+            dt,
+            raw: `{"bucket":"${label}","i":${index}}`,
+            message: `${label}-${index}`,
+          });
+        }
+      };
+      pushBucket(newerDt, newerCount, "new");
+      pushBucket(olderDt, olderCount, "old");
+      return rows;
+    };
+
+    executeMock.mockImplementation((options: Record<string, unknown>) => {
+      const since = typeof options.since === "string" ? options.since : undefined;
+      const until = typeof options.until === "string" ? options.until : undefined;
+      const limit = typeof options.limit === "number" ? options.limit : newerCount;
+      const offset = typeof options.offset === "number" ? options.offset : 0;
+      if (!since) {
+        return Promise.resolve([{ dt: baseline, raw: "{}", message: "baseline" }]);
+      }
+      const visible = sequenceFor(until).filter((row) => row.dt >= since);
+      return Promise.resolve(visible.slice(offset, offset + limit));
+    });
+
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    await tailLogs({ source: "source-a", follow: true, format: "json" });
+    await poll?.();
+
+    expect(calls.some((options) => options.until === olderDt && options.offset === 10_000)).toBe(
+      true,
+    );
+    const counts = messageCounts(logSpy);
+    expect(counts.get("baseline")).toBe(1);
+    expect(counts.get("new-0")).toBe(1);
+    expect(counts.get("new-9999")).toBe(1);
+    expect(counts.get("old-0")).toBe(1);
+    expect(counts.get("old-10000")).toBe(1);
+    expect(counts.get("old-19999")).toBe(1);
+    expect(counts.size).toBe(newerCount + olderCount + 1);
+
+    await poll?.();
+
+    expect(messageCounts(logSpy).size).toBe(newerCount + olderCount + 1);
+  }, 30_000);
+
+  it("keeps identical rows from a later offset page", async () => {
+    const baseline = "2025-09-24 12:00:00.000000";
+    const shared = "2025-09-24 12:00:05.000000";
+    const total = 10_001;
+
+    executeMock.mockImplementation((options: Record<string, unknown>) => {
+      const since = typeof options.since === "string" ? options.since : undefined;
+      const until = typeof options.until === "string" ? options.until : undefined;
+      const limit = typeof options.limit === "number" ? options.limit : total;
+      const offset = typeof options.offset === "number" ? options.offset : 0;
+      if (!since) {
+        return Promise.resolve([{ dt: baseline, raw: "{}", message: "baseline" }]);
+      }
+      if ((until !== undefined && until < shared) || shared < since) {
+        return Promise.resolve([]);
+      }
+      const page: LogEntry[] = [];
+      for (let index = offset; index < total && page.length < limit; index += 1) {
+        page.push({ dt: shared, raw: "{}", message: "same" });
+      }
+      return Promise.resolve(page);
+    });
+
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    await tailLogs({ source: "source-a", follow: true, format: "json" });
+    await poll?.();
+
+    expect(messageCounts(logSpy).get("same")).toBe(total);
+    expect(messageCounts(logSpy).get("baseline")).toBe(1);
+
+    await poll?.();
+
+    expect(messageCounts(logSpy).get("same")).toBe(total);
+  }, 20_000);
+
+  it("commits a multi-source cursor after an empty completed window", async () => {
+    const baseline = "2025-09-24 12:00:00.000000";
+    const shared = "2025-09-24 12:00:05.000000";
+    const newer = "2025-09-24 12:00:06.000000";
+    const total = 200_000;
+
+    executeMock.mockImplementation((options: Record<string, unknown>) => {
+      const source = typeof options.source === "string" ? options.source : "";
+      const since = typeof options.since === "string" ? options.since : undefined;
+      const until = typeof options.until === "string" ? options.until : undefined;
+      const limit = typeof options.limit === "number" ? options.limit : 100;
+      const offset = typeof options.offset === "number" ? options.offset : 0;
+      if (source === "source-a") {
+        if (!since) {
+          return Promise.resolve([{ dt: baseline, raw: "{}", message: "baseline-a" }]);
+        }
+        return Promise.resolve([]);
+      }
+      if (!since) {
+        return Promise.resolve([]);
+      }
+      if (until === shared && offset >= total) {
+        return Promise.resolve([]);
+      }
+      if (since === shared && until === undefined && offset === 0) {
+        return Promise.resolve([{ dt: newer, raw: '{"id":"newer"}', message: "newer" }]);
+      }
+      if (until !== undefined && until < shared) {
+        return Promise.resolve([]);
+      }
+      const page: LogEntry[] = [];
+      for (let index = offset; index < total && page.length < limit; index += 1) {
+        page.push({ dt: shared, raw: `{"i":${index}}`, message: `burst-${index}` });
+      }
+      return Promise.resolve(page);
+    });
+
+    let poll: (() => Promise<void>) | undefined;
+    globalThis.setInterval = ((handler: () => Promise<void>) => {
+      poll = handler;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    await tailLogs({
+      sources: ["source-a", "source-b"],
+      follow: true,
+      format: "json",
+    });
+    await poll?.();
+
+    const afterBurst = loggedText(logSpy);
+    expect(afterBurst).toContain("burst-0");
+    expect(afterBurst).toContain("burst-199999");
+    expect(afterBurst).not.toContain("newer");
+
+    await poll?.();
+
+    expect(
+      calls.some(
+        (options) =>
+          options.source === "source-b" && options.until === shared && options.offset === total,
+      ),
+    ).toBe(true);
+    expect(loggedText(logSpy)).not.toContain("newer");
+
+    const marked = calls.length;
+    await poll?.();
+
+    const resumed = calls.slice(marked).find((options) => options.source === "source-b");
+    expect(resumed?.since).toBe(shared);
+    expect(resumed?.until).toBeUndefined();
+    expect(resumed?.offset).toBeUndefined();
+    expect(loggedText(logSpy)).toContain("newer");
+  }, 60_000);
 });
 
 function messageCounts(logSpy: LogSpy): Map<string, number> {
@@ -398,4 +577,8 @@ function messageCounts(logSpy: LogSpy): Map<string, number> {
     counts.set(message, (counts.get(message) ?? 0) + 1);
   }
   return counts;
+}
+
+function loggedText(logSpy: LogSpy): string {
+  return logSpy.mock.calls.map((call) => String(call[0])).join("\n");
 }

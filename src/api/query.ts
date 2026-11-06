@@ -280,8 +280,9 @@ export class QueryAPI {
       }
     }
 
-    // Add ORDER BY and LIMIT
-    sql += " ORDER BY dt DESC";
+    // raw breaks dt ties so later OFFSET pages follow the same row order,
+    // even when the SELECT list does not include raw.
+    sql += " ORDER BY dt DESC, raw";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
     const offset = sqlOffset(options.offset);
     if (offset > 0) {

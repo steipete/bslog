@@ -282,9 +282,10 @@ async function runMultiSource(
 
       for (const source of sources) {
         const window = followWindows.get(source);
-        if (!window || (window.rows.length === 0 && window.complete)) {
+        if (!window) {
           continue;
         }
+        // An empty completed window still commits a pending high-water mark.
         const cursor = cursors.get(source) ?? emptyFollowCursor();
         applyFollowWindow(cursor, window, unseenBySource.get(source) ?? []);
         cursors.set(source, cursor);
@@ -489,7 +490,8 @@ function mergeNewRows(existing: LogEntry[], page: LogEntry[]): LogEntry[] {
 const MAX_FOLLOW_HOPS = 20;
 
 // Newest-first LIMIT hides older rows inside since. The bound keeps the
-// server timestamp's fraction; a full bucket continues with OFFSET. An
+// server timestamp's fraction. OFFSET continues a full bucket, and the
+// offset counts only rows already read when the bound changes. An
 // unfinished hop returns that bound so the next poll does not restart.
 async function fetchFollowWindow(
   api: QueryAPI,
@@ -503,6 +505,7 @@ async function fetchFollowWindow(
   let complete = false;
 
   for (let hop = 0; hop < MAX_FOLLOW_HOPS; hop += 1) {
+    const requestedSkip = skip;
     let limit = Math.max(1, pollLimit);
     let page = await api.execute(followPageOptions(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
@@ -519,21 +522,25 @@ async function fetchFollowWindow(
       break;
     }
 
-    rows = mergeNewRows(rows, page);
+    // A positive OFFSET is the next slice of this bound, not a reread.
+    rows = requestedSkip > 0 ? rows.concat(page) : mergeNewRows(rows, page);
     if (page.length < limit) {
       complete = true;
       break;
     }
 
     const oldest = page.reduce((min, entry) => (entry.dt < min ? entry.dt : min), page[0].dt);
-    const sameBucket = page.every((entry) => entry.dt === oldest);
-    if (sameBucket || until === oldest) {
-      until = oldest;
+    if (until === oldest) {
       skip += page.length;
       continue;
     }
     until = oldest;
     skip = 0;
+    for (const entry of page) {
+      if (entry.dt === oldest) {
+        skip += 1;
+      }
+    }
   }
 
   rows.sort(compareNewestFirst);

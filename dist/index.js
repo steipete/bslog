@@ -5260,7 +5260,7 @@ class QueryAPI {
         sql += ` WHERE ${conditions.join(" AND ")}`;
       }
     }
-    sql += " ORDER BY dt DESC";
+    sql += " ORDER BY dt DESC, raw";
     sql += ` LIMIT ${resolveQueryLimit(options.limit, config.defaultLimit)}`;
     const offset = sqlOffset(options.offset);
     if (offset > 0) {
@@ -6046,7 +6046,7 @@ Following logs... (Press Ctrl+C to stop)`));
       }
       for (const source of sources) {
         const window = followWindows.get(source);
-        if (!window || window.rows.length === 0 && window.complete) {
+        if (!window) {
           continue;
         }
         const cursor = cursors.get(source) ?? emptyFollowCursor();
@@ -6214,6 +6214,7 @@ async function fetchFollowWindow(api, options, pollLimit, resumeSkip = 0) {
   let skip = resumeSkip;
   let complete = false;
   for (let hop = 0;hop < MAX_FOLLOW_HOPS; hop += 1) {
+    const requestedSkip = skip;
     let limit = Math.max(1, pollLimit);
     let page = await api.execute(followPageOptions(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
@@ -6228,20 +6229,23 @@ async function fetchFollowWindow(api, options, pollLimit, resumeSkip = 0) {
       complete = true;
       break;
     }
-    rows = mergeNewRows(rows, page);
+    rows = requestedSkip > 0 ? rows.concat(page) : mergeNewRows(rows, page);
     if (page.length < limit) {
       complete = true;
       break;
     }
     const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
-    const sameBucket = page.every((entry) => entry.dt === oldest);
-    if (sameBucket || until === oldest) {
-      until = oldest;
+    if (until === oldest) {
       skip += page.length;
       continue;
     }
     until = oldest;
     skip = 0;
+    for (const entry of page) {
+      if (entry.dt === oldest) {
+        skip += 1;
+      }
+    }
   }
   rows.sort(compareNewestFirst);
   if (complete || !until) {
@@ -6552,7 +6556,7 @@ Following logs... (Press Ctrl+C to stop)`));
       }
       for (const source of sources) {
         const window = followWindows.get(source);
-        if (!window || window.rows.length === 0 && window.complete) {
+        if (!window) {
           continue;
         }
         const cursor = cursors.get(source) ?? emptyFollowCursor2();
@@ -6720,6 +6724,7 @@ async function fetchFollowWindow2(api, options, pollLimit, resumeSkip = 0) {
   let skip = resumeSkip;
   let complete = false;
   for (let hop = 0;hop < MAX_FOLLOW_HOPS2; hop += 1) {
+    const requestedSkip = skip;
     let limit = Math.max(1, pollLimit);
     let page = await api.execute(followPageOptions2(options, until, limit, skip));
     while (page.length >= limit && limit < MAX_QUERY_LIMIT) {
@@ -6734,20 +6739,23 @@ async function fetchFollowWindow2(api, options, pollLimit, resumeSkip = 0) {
       complete = true;
       break;
     }
-    rows = mergeNewRows2(rows, page);
+    rows = requestedSkip > 0 ? rows.concat(page) : mergeNewRows2(rows, page);
     if (page.length < limit) {
       complete = true;
       break;
     }
     const oldest = page.reduce((min, entry) => entry.dt < min ? entry.dt : min, page[0].dt);
-    const sameBucket = page.every((entry) => entry.dt === oldest);
-    if (sameBucket || until === oldest) {
-      until = oldest;
+    if (until === oldest) {
       skip += page.length;
       continue;
     }
     until = oldest;
     skip = 0;
+    for (const entry of page) {
+      if (entry.dt === oldest) {
+        skip += 1;
+      }
+    }
   }
   rows.sort(compareNewestFirst2);
   if (complete || !until) {

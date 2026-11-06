@@ -260,6 +260,39 @@ describe("Query Builder Integration", () => {
       expect(ignored).not.toContain("OFFSET");
     });
 
+    it("orders offset pages by raw when timestamps tie", async () => {
+      const paged = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        limit: 10000,
+        offset: 10000,
+      });
+      expect(paged).toContain("ORDER BY dt DESC, raw");
+      expect(paged).toContain("OFFSET 10000");
+
+      const projected = await queryAPI.buildQuery({
+        source: "test-source",
+        hotOnly: true,
+        fields: ["message"],
+        limit: 10000,
+        offset: 10000,
+      });
+      expect(projected).toContain("JSON_VALUE(raw, '$.message') AS \"message\"");
+      expect(projected).not.toContain("SELECT dt, raw");
+      expect(projected).toContain("ORDER BY dt DESC, raw");
+      expect(projected).toContain("OFFSET 10000");
+
+      const archived = await queryAPI.buildQuery({
+        source: "test-source",
+        fields: ["message"],
+        limit: 10000,
+        offset: 10000,
+      });
+      expect(archived).toContain("UNION ALL");
+      expect(archived).not.toContain("SELECT dt, raw FROM (");
+      expect(archived).toContain("ORDER BY dt DESC, raw");
+    });
+
     it("should push time bounds into both storage branches", async () => {
       const sql = await queryAPI.buildQuery({
         source: "test-source",
@@ -287,7 +320,7 @@ describe("Query Builder Integration", () => {
         "SELECT dt, JSON_VALUE(raw, '$.message') AS \"message\" FROM (SELECT dt, raw FROM remote",
       );
       expect(sql).toContain(
-        ") WHERE raw LIKE '%timeout%' ORDER BY dt DESC LIMIT 25 FORMAT JSONEachRow",
+        ") WHERE raw LIKE '%timeout%' ORDER BY dt DESC, raw LIMIT 25 FORMAT JSONEachRow",
       );
     });
 
