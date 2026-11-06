@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Refuse to save over a config file that is not valid JSON, so a later `config set` or history write cannot replace it with defaults.
+
 ## [1.7.0] - 2026-10-23
 
 **Highlights:** Format SQL-function results as JSON while preserving UTC follow timestamps and structured query filters.

@@ -4606,6 +4606,14 @@ function saveConfig(config) {
   writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
 }
 function updateConfig(updates) {
+  const configFile = getConfigFile();
+  if (existsSync(configFile)) {
+    try {
+      JSON.parse(readFileSync(configFile, "utf-8"));
+    } catch {
+      throw new Error(`Refusing to overwrite invalid config at ${configFile}`);
+    }
+  }
   const config = loadConfig();
   const newConfig = { ...config, ...updates };
   saveConfig(newConfig);
