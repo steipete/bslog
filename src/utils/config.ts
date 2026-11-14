@@ -72,7 +72,21 @@ export function saveConfig(config: Config): void {
   writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
 }
 
+class InvalidConfigError extends Error {}
+
 export function updateConfig(updates: Partial<Config>): void {
+  const configFile = getConfigFile();
+  if (existsSync(configFile)) {
+    try {
+      JSON.parse(readFileSync(configFile, "utf-8"));
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      throw new InvalidConfigError(
+        `Refusing to overwrite invalid config at ${configFile}. Back up and repair the JSON file before retrying.`,
+      );
+    }
+  }
+
   const config = loadConfig();
   const newConfig = { ...config, ...updates };
   saveConfig(newConfig);
@@ -88,7 +102,12 @@ export function addToHistory(query: string): void {
     history.pop();
   }
 
-  updateConfig({ queryHistory: history });
+  try {
+    updateConfig({ queryHistory: history });
+  } catch (error) {
+    if (!(error instanceof InvalidConfigError)) throw error;
+    console.warn(`Query history was not saved: ${error.message}`);
+  }
 }
 
 // Common source aliases for convenience

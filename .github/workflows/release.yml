@@ -37,7 +37,7 @@ jobs:
       ci-check-events: '["push"]'
       node-version: "24"
       package-manager: bun
-      package-manager-version: "1.4.1"
+      package-manager-version: "1.4.4"
       test-command: bun run ci
       build-command: bun run build:npm
       smoke-command: node ./node_modules/@steipete/bslog/dist/index.js --version && node ./node_modules/@steipete/bslog/dist/index.js --help

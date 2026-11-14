@@ -2230,7 +2230,7 @@ var createBuilder = (self, _styler, _isEmpty) => {
       return applyStyle(builder, "" + arguments_[0]);
     }
     if (arguments_.length === 2) {
-      return applyStyle(builder, arguments_[0] + " " + arguments_[1]);
+      return applyStyle(builder, `${arguments_[0] ?? ""} ${arguments_[1] ?? ""}`);
     }
     return applyStyle(builder, arguments_.join(" "));
   };
@@ -2411,9 +2411,9 @@ class Help {
       if (!removeShort && !removeLong) {
         visibleOptions.push(helpOption);
       } else if (helpOption.long && !removeLong) {
-        visibleOptions.push(cmd.createOption(helpOption.long, helpOption.description));
+        visibleOptions.push(cmd.createOption(helpOption.long, helpOption.description).helpGroup(helpOption.helpGroupHeading));
       } else if (helpOption.short && !removeShort) {
-        visibleOptions.push(cmd.createOption(helpOption.short, helpOption.description));
+        visibleOptions.push(cmd.createOption(helpOption.short, helpOption.description).helpGroup(helpOption.helpGroupHeading));
       }
     }
     if (this.sortOptions) {
@@ -2725,7 +2725,7 @@ class Option {
     this.description = description || "";
     this.required = flags.includes("<");
     this.optional = flags.includes("[");
-    this.variadic = /\w\.\.\.[>\]]$/.test(flags);
+    this.variadic = /\p{ID_Continue}\.\.\.[>\]]$/u.test(flags);
     this.mandatory = false;
     const optionFlags = splitOptionFlags(flags);
     this.short = optionFlags.shortFlag;
@@ -3397,7 +3397,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
   getOptionValueSourceWithGlobals(key) {
     let source;
     this._getCommandAndAncestors().forEach((cmd) => {
-      if (cmd.getOptionValueSource(key) !== undefined) {
+      if (Object.hasOwn(cmd._optionValueSources, key)) {
         source = cmd.getOptionValueSource(key);
       }
     });
@@ -3813,7 +3813,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
       return arg.length > 1 && arg[0] === "-";
     }
     const negativeNumberArg = (arg) => {
-      if (!/^-(\d+|\d*\.\d+)(e[+-]?\d+)?$/.test(arg))
+      if (!/^-(\d+|\d*\.\d+)([eE][+-]?\d+)?$/.test(arg))
         return false;
       return !this._getCommandAndAncestors().some((cmd) => cmd.options.map((opt) => opt.short).some((short) => /^-\d$/.test(short)));
     };
@@ -4280,16 +4280,16 @@ function incrementNodeInspectorPort(args) {
     let debugHost = "127.0.0.1";
     let debugPort = "9229";
     let match;
-    if ((match = arg.match(/^(--inspect(-brk)?)$/)) !== null) {
+    if ((match = arg.match(/^(--inspect(-brk|-wait)?)$/)) !== null) {
       debugOption = match[1];
-    } else if ((match = arg.match(/^(--inspect(-brk|-port)?)=([^:]+)$/)) !== null) {
+    } else if ((match = arg.match(/^(--inspect(-brk|-port|-wait)?)=(\[[^\]]+\]|[^:]+)$/)) !== null) {
       debugOption = match[1];
       if (/^\d+$/.test(match[3])) {
         debugPort = match[3];
       } else {
         debugHost = match[3];
       }
-    } else if ((match = arg.match(/^(--inspect(-brk|-port)?)=([^:]+):(\d+)$/)) !== null) {
+    } else if ((match = arg.match(/^(--inspect(-brk|-port|-wait)?)=(\[[^\]]+\]|[^:]+):(\d+)$/)) !== null) {
       debugOption = match[1];
       debugHost = match[3];
       debugPort = match[4];
@@ -4364,21 +4364,21 @@ var package_default = {
     "lint:fix": "bun run format && oxlint --fix src"
   },
   dependencies: {
-    chalk: "^6.0.0",
+    chalk: "^6.0.1",
     "cli-table3": "^0.6.5",
-    commander: "^15.0.0"
+    commander: "^15.1.0"
   },
   devDependencies: {
-    "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.1",
-    oxfmt: "^0.66.0",
-    oxlint: "^1.81.0",
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.6",
+    oxfmt: "^0.78.0",
+    oxlint: "^1.93.0",
     typescript: "^7.0.2"
   },
   engines: {
     bun: ">=1.0.0"
   },
-  packageManager: "bun@1.4.1"
+  packageManager: "bun@1.4.4"
 };
 
 // node_modules/chalk/source/index.js
@@ -4509,7 +4509,7 @@ var createBuilder2 = (self, _styler, _isEmpty) => {
       return applyStyle2(builder, "" + arguments_[0]);
     }
     if (arguments_.length === 2) {
-      return applyStyle2(builder, arguments_[0] + " " + arguments_[1]);
+      return applyStyle2(builder, `${arguments_[0] ?? ""} ${arguments_[1] ?? ""}`);
     }
     return applyStyle2(builder, arguments_.join(" "));
   };
@@ -4605,7 +4605,20 @@ function saveConfig(config) {
   }
   writeFileSync(getConfigFile(), JSON.stringify(config, null, 2));
 }
+
+class InvalidConfigError extends Error {
+}
 function updateConfig(updates) {
+  const configFile = getConfigFile();
+  if (existsSync(configFile)) {
+    try {
+      JSON.parse(readFileSync(configFile, "utf-8"));
+    } catch (error) {
+      if (!(error instanceof SyntaxError))
+        throw error;
+      throw new InvalidConfigError(`Refusing to overwrite invalid config at ${configFile}. Back up and repair the JSON file before retrying.`);
+    }
+  }
   const config = loadConfig();
   const newConfig = { ...config, ...updates };
   saveConfig(newConfig);
@@ -4617,7 +4630,13 @@ function addToHistory(query) {
   if (history.length > 100) {
     history.pop();
   }
-  updateConfig({ queryHistory: history });
+  try {
+    updateConfig({ queryHistory: history });
+  } catch (error) {
+    if (!(error instanceof InvalidConfigError))
+      throw error;
+    console.warn(`Query history was not saved: ${error.message}`);
+  }
 }
 var SOURCE_ALIASES = {
   dev: "sweetistics-dev",
@@ -5870,7 +5889,7 @@ Following logs... (Press Ctrl+C to stop)`));
   const intervalMs = resolveInterval(runtime.interval);
   const pollLimit = Math.max(1, Math.min(50, options.limit ?? 50));
   const sinceFallback = options.since ?? "1m";
-  setInterval(async () => {
+  scheduleFollowPoll(intervalMs, async () => {
     try {
       const pollOptions = {
         ...options,
@@ -5892,7 +5911,7 @@ Following logs... (Press Ctrl+C to stop)`));
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
   process.stdin.resume();
 }
 async function runMultiSource(api, baseOptions, runtime, sources) {
@@ -5945,7 +5964,7 @@ Following logs... (Press Ctrl+C to stop)`));
   const intervalMs = resolveInterval(runtime.interval);
   const pollLimit = Math.max(1, Math.min(50, limit));
   const fallbackSince = baseOptions.since ? undefined : "1m";
-  setInterval(async () => {
+  scheduleFollowPoll(intervalMs, async () => {
     try {
       const { combined, latestBySource: followLatest } = await collect(perSourceLatest, pollLimit, fallbackSince);
       if (combined.length > 0) {
@@ -5967,8 +5986,22 @@ Following logs... (Press Ctrl+C to stop)`));
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
   process.stdin.resume();
+}
+function scheduleFollowPoll(intervalMs, poll) {
+  let inFlight = false;
+  setInterval(async () => {
+    if (inFlight) {
+      return;
+    }
+    inFlight = true;
+    try {
+      await poll();
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
 }
 function resolveFormat(format, jqFilter) {
   if (jqFilter) {
@@ -6149,7 +6182,7 @@ Following logs... (Press Ctrl+C to stop)`));
   const intervalMs = resolveInterval2(runtime.interval);
   const pollLimit = Math.max(1, Math.min(50, options.limit ?? 50));
   const sinceFallback = options.since ?? "1m";
-  setInterval(async () => {
+  scheduleFollowPoll2(intervalMs, async () => {
     try {
       const pollOptions = {
         ...options,
@@ -6171,7 +6204,7 @@ Following logs... (Press Ctrl+C to stop)`));
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
   process.stdin.resume();
 }
 async function runMultiSource2(api, baseOptions, runtime, sources) {
@@ -6224,7 +6257,7 @@ Following logs... (Press Ctrl+C to stop)`));
   const intervalMs = resolveInterval2(runtime.interval);
   const pollLimit = Math.max(1, Math.min(50, limit));
   const fallbackSince = baseOptions.since ? undefined : "1m";
-  setInterval(async () => {
+  scheduleFollowPoll2(intervalMs, async () => {
     try {
       const { combined, latestBySource: followLatest } = await collect(perSourceLatest, pollLimit, fallbackSince);
       if (combined.length > 0) {
@@ -6246,8 +6279,22 @@ Following logs... (Press Ctrl+C to stop)`));
       const message = error instanceof Error ? error.message : String(error);
       console.error(source_default2.red(`Polling error: ${message}`));
     }
-  }, intervalMs);
+  });
   process.stdin.resume();
+}
+function scheduleFollowPoll2(intervalMs, poll) {
+  let inFlight = false;
+  setInterval(async () => {
+    if (inFlight) {
+      return;
+    }
+    inFlight = true;
+    try {
+      await poll();
+    } finally {
+      inFlight = false;
+    }
+  }, intervalMs);
 }
 function resolveFormat2(format, jqFilter) {
   if (jqFilter) {
