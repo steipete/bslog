@@ -51,19 +51,19 @@
     "lint:fix": "bun run format && oxlint --fix src"
   },
   "dependencies": {
-    "chalk": "^6.0.0",
+    "chalk": "^6.0.1",
     "cli-table3": "^0.6.5",
-    "commander": "^15.0.0"
+    "commander": "^15.1.0"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.1",
-    "oxfmt": "^0.66.0",
-    "oxlint": "^1.81.0",
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.6.6",
+    "oxfmt": "^0.78.0",
+    "oxlint": "^1.93.0",
     "typescript": "^7.0.2"
   },
   "engines": {
     "bun": ">=1.0.0"
   },
-  "packageManager": "bun@1.4.1"
+  "packageManager": "bun@1.4.4"
 }

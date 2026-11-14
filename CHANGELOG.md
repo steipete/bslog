@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Serialize slow follow polls and resume polling after errors. Thanks @SebTardif.
+- Update compatible runtime and development dependencies.
+
+- Refuse to overwrite malformed configuration and explain how to recover it; keep read-only queries working when history cannot be saved. Thanks @SebTardif.
+
 ## [1.7.0] - 2026-10-23
 
 **Highlights:** Format SQL-function results as JSON while preserving UTC follow timestamps and structured query filters.

@@ -196,6 +196,15 @@ describe("Config Utilities", () => {
   });
 
   describe("updateConfig", () => {
+    it("does not replace an invalid config file", () => {
+      fs.writeFileSync(CONFIG_FILE, "{");
+
+      expect(() => updateConfig({ defaultLimit: 5 })).toThrow(
+        /Refusing to overwrite invalid config/,
+      );
+      expect(fs.readFileSync(CONFIG_FILE, "utf-8")).toBe("{");
+    });
+
     it("should merge updates with existing config", () => {
       const initial = {
         defaultSource: "dev",
@@ -253,6 +262,12 @@ describe("Config Utilities", () => {
   });
 
   describe("addToHistory", () => {
+    it("preserves malformed config without blocking a read-only query", () => {
+      fs.writeFileSync(CONFIG_FILE, "{");
+      expect(() => addToHistory("SELECT 1")).not.toThrow();
+      expect(fs.readFileSync(CONFIG_FILE, "utf-8")).toBe("{");
+    });
+
     it("should add query to beginning of history", () => {
       saveConfig({
         defaultLimit: 100,
