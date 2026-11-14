@@ -91,6 +91,8 @@ Follow mode polls each source independently. `trace` applies the request ID as a
 
 bslog stores non-secret settings in `~/.bslog/config.json` by default. Set `BSLOG_CONFIG_DIR` to a non-empty directory path to store `config.json` elsewhere. You can set a default source, query limit, output format, log level, or regional Query API URL with `bslog config`; credentials remain in environment variables.
 
+If `config.json` contains malformed JSON, back up and repair the file before changing settings. Queries can still run with default settings, but warn that their history was not saved; the damaged file is preserved.
+
 See the [CLI reference](docs/cli-reference.md) for every command, shared option, configuration key, time format, output mode, and built-in source alias.
 
 ## Community
