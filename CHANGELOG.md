@@ -4,10 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Serialize slow follow polls and resume polling after errors. Thanks @SebTardif.
-- Update compatible runtime and development dependencies.
+## [1.7.1] - 2026-11-15
+
+**Highlights:** Preserve malformed configuration and keep follow polling reliable through slow requests and errors.
 
 - Refuse to overwrite malformed configuration and explain how to recover it; keep read-only queries working when history cannot be saved. Thanks @SebTardif.
+- Serialize slow follow polls and resume polling after errors. Thanks @SebTardif.
+- Update compatible runtime and development dependencies.
 
 ## [1.7.0] - 2026-10-23
 
